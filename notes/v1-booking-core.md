@@ -1,1 +1,0 @@
-Buchungskern in Arbeit.
