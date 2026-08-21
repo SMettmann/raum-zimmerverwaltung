@@ -18,6 +18,7 @@ jobs:
           node --check core.js
           node --check requirements.js
           node --check xrechnung.js
+          node --check cleaning-v2.js
           node --check manage.js
           node --check public-booking.js
           node --check tests/generate-xrechnung-sample.cjs
