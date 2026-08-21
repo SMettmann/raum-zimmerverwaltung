@@ -22,8 +22,11 @@ jobs:
           node --check manage.js
           node --check public-booking.js
           node --check tests/generate-xrechnung-sample.cjs
+          node --check tests/cleaning-v2-smoke.cjs
           node --check worker/index.js
           node --check worker/entry.js
+      - name: Cleaning V2 smoke test
+        run: node tests/cleaning-v2-smoke.cjs
       - name: Install Wrangler
         run: npm install
       - name: Wrangler dry run
