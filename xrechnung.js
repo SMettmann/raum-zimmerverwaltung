@@ -113,3 +113,13 @@ if(typeof document!=='undefined'&&typeof RaumwerkXRechnung!=='undefined'){
     }catch(e){alert(e.message)}
   };
 }
+
+if(typeof window!=='undefined'&&typeof document!=='undefined'){
+  window.addEventListener('load',()=>{
+    if(document.querySelector('script[data-cleaning-v2]'))return;
+    const script=document.createElement('script');
+    script.src='cleaning-v2.js';
+    script.dataset.cleaningV2='1';
+    document.body.appendChild(script);
+  });
+}
