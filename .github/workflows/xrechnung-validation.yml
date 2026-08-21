@@ -1,0 +1,42 @@
+name: XRechnung KoSIT Validation
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate-xrechnung:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Generate RAUMWERK sample invoice
+        run: node tests/generate-xrechnung-sample.cjs
+      - name: Download official KoSIT validator and XRechnung 3.0.2 configuration
+        run: |
+          curl -L --fail --retry 3 "https://github.com/itplr-kosit/validator/releases/download/v1.6.2/validator-1.6.2-standalone.jar" -o validator.jar
+          curl -L --fail --retry 3 "https://github.com/itplr-kosit/validator-configuration-xrechnung/releases/download/v2026-01-31/xrechnung-3.0.2-validator-configuration-2026-01-31.zip" -o validator-config.zip
+          mkdir validator-config
+          unzip -q validator-config.zip -d validator-config
+      - name: Validate generated XRechnung
+        shell: bash
+        run: |
+          SCENARIOS="$(find validator-config -name scenarios.xml -print -quit)"
+          test -n "$SCENARIOS"
+          CONFIG_DIR="$(dirname "$SCENARIOS")"
+          java -jar validator.jar -s "$SCENARIOS" -r "$CONFIG_DIR" -h tests/out/xrechnung-sample.xml
+          REPORT="$(find . -name 'xrechnung-sample-report.xml' -print -quit)"
+          test -n "$REPORT"
+          echo "KoSIT report: $REPORT"
+          if grep -qE '<([[:alnum:]_-]+:)?reject([[:space:]/>])' "$REPORT"; then
+            echo 'XRechnung was rejected by KoSIT.'
+            cat "$REPORT"
+            exit 1
+          fi
+          echo 'XRechnung accepted by KoSIT.'

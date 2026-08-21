@@ -7,11 +7,18 @@ RAUMWERK ist eine bewusst sehr einfach bedienbare Raum- und Zimmerverwaltung: ö
 - Dashboard mit Tagesübersicht
 - Monatskalender und Buchungsliste
 - Buchungen anlegen, bearbeiten, stornieren und löschen
-- automatische Prüfung auf Doppelbelegung
+- automatische Prüfung auf Doppelbelegung und Sperrzeiten
 - Räume und Zimmer anlegen und bearbeiten
 - Gäste und Kunden verwalten
-- Reinigungsstatus pro Raum
+- Reinigungsstatus plus echte Reinigungsplanung
+- automatische Reinigungsjobs nach Buchungsende
 - Aufgabenverwaltung
+- Einsatzplanung
+- Vermietungs- und Sperrzeiträume
+- Vertragsmanagement mit Druck/PDF
+- Rechnungsverwaltung mit offen/bezahlt und Druck/PDF
+- XRechnung-XML
+- öffentliche Online-Buchungsanfragen mit Verfügbarkeitsprüfung
 - Buchungsbestätigung druckbar / als PDF speicherbar
 - CSV-Export und Datensicherung
 - responsive Bedienung für Desktop und Smartphone
@@ -22,9 +29,9 @@ RAUMWERK ist eine bewusst sehr einfach bedienbare Raum- und Zimmerverwaltung: ö
 
 ## Verhalten ohne Backend
 
-Solange kein Cloudflare-Backend eingerichtet ist, läuft die Web-App wie bisher automatisch im lokalen Browsermodus. Dadurch bleibt der bestehende Prototyp jederzeit nutzbar.
+Solange kein Cloudflare-Backend eingerichtet ist, läuft die Web-App automatisch im lokalen Browsermodus. Dadurch bleibt der Prototyp jederzeit nutzbar.
 
-## Cloud-Backend einrichten
+## Cloud-Backend lokal einrichten
 
 Voraussetzung: Node.js und ein Cloudflare-Konto.
 
@@ -48,7 +55,23 @@ Danach deployen:
 npm run deploy
 ```
 
-Beim ersten Öffnen der bereitgestellten RAUMWERK-Adresse erscheint automatisch die Ersteinrichtung. Der erste Zugang wird Administrator; vorhandene lokale Räume und Buchungen können dabei direkt in den zentralen Datenstand übernommen werden.
+Beim ersten Öffnen der bereitgestellten RAUMWERK-Adresse erscheint automatisch die Ersteinrichtung. Der erste Zugang wird Administrator; vorhandene lokale Daten können direkt in den zentralen Datenstand übernommen werden.
+
+## Produktionsdeployment über GitHub Actions
+
+Der Workflow `Deploy RAUMWERK to Cloudflare` kann manuell gestartet werden. Dafür werden in den GitHub Actions Secrets drei Werte benötigt:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+- `RAUMWERK_D1_DATABASE_ID`
+
+Der Workflow erzeugt daraus nur für den Lauf eine Deployment-Konfiguration, spielt `schema.sql` sicher mit `CREATE TABLE IF NOT EXISTS` ein und deployt danach Worker und Frontend. Die D1-Datenbank-ID muss deshalb nicht fest ins Repository geschrieben werden.
+
+## XRechnung
+
+Der produktiv geladene XRechnung-Generator erzeugt UBL 2.1 für XRechnung 3.0.x. Eine von diesem Generator erzeugte Musterrechnung wird in GitHub Actions automatisch mit dem offiziellen KoSIT-Validator und der XRechnung-Konfiguration `v2026-01-31` geprüft.
+
+Der Test verwendet aktuell KoSIT Validator 1.6.2 und die XRechnung-3.0.2-Validator-Konfiguration 2026-01-31. Ein Merge sollte nur erfolgen, wenn der KoSIT-Report die Musterrechnung akzeptiert.
 
 ## Rollen
 
