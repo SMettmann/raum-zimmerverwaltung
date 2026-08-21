@@ -1,10 +1,12 @@
 worker/
 schema.sql
 wrangler.jsonc
+wrangler.deploy.jsonc
 package.json
 package-lock.json
 README.md
 .github/
+tests/
 node_modules/
 .wrangler/
 .git/
