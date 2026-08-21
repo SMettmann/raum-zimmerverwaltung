@@ -18,16 +18,38 @@ async function loadOrgState(env){
   return {...row,state};
 }
 function overlap(aFrom,aTo,bFrom,bTo){return aFrom<=bTo&&aTo>=bFrom}
+function rentalAllowed(state,roomId,from,to){
+  const periods=Array.isArray(state.settings?.rentalPeriods)?state.settings.rentalPeriods:[];
+  const scoped=periods.filter(p=>p.roomId==='*'||p.roomId===roomId);
+  return !scoped.length||scoped.some(p=>p.from<=from&&p.to>=to);
+}
 function available(state,roomId,from,to){
   const booked=(state.bookings||[]).some(b=>b.roomId===roomId&&b.status!=='cancelled'&&overlap(from,to,b.from,b.to));
   const blocked=(state.blocks||[]).some(b=>b.roomId===roomId&&overlap(from,to,b.from,b.to));
-  return !booked&&!blocked;
+  return !booked&&!blocked&&rentalAllowed(state,roomId,from,to);
+}
+function bookingMode(state){return state.settings?.onlineBookingMode==='direct'?'direct':'request'}
+function upsertPublicGuest(state,{name,email,phone}){
+  state.guests=Array.isArray(state.guests)?state.guests:[];
+  const lowerEmail=email.toLowerCase(),lowerName=name.toLowerCase();
+  const existing=state.guests.find(g=>(g.email&&String(g.email).toLowerCase()===lowerEmail)||String(g.name||'').toLowerCase()===lowerName);
+  if(existing){existing.name=name;existing.email=email;existing.phone=phone||existing.phone||'';return existing}
+  const guest={id:crypto.randomUUID(),name,email,phone,note:'Online-Buchung'};state.guests.push(guest);return guest;
+}
+function addDirectBooking(state,data){
+  state.bookings=Array.isArray(state.bookings)?state.bookings:[];
+  const id=crypto.randomUUID(),createdAt=new Date().toISOString();
+  state.bookings.push({id,roomId:data.roomId,guest:data.name,from:data.from,to:data.to,purpose:data.purpose,participants:data.participants,status:'confirmed',note:data.note,createdAt,source:'public-direct'});
+  upsertPublicGuest(state,data);
+  state.cleaningPlans=Array.isArray(state.cleaningPlans)?state.cleaningPlans:[];
+  state.cleaningPlans.push({id:crypto.randomUUID(),bookingId:id,roomId:data.roomId,date:data.to,time:'10:00',owner:'',note:'Automatisch nach Buchungsende',status:'planned',auto:true,source:'booking'});
+  return id;
 }
 async function handlePublic(request,env,url){
   if(request.method!=='GET'&&request.method!=='HEAD'&&!sameOrigin(request,url))return json({error:'Ungültiger Ursprung.'},403);
   const data=await loadOrgState(env);if(!data)return json({error:'RAUMWERK ist noch nicht eingerichtet.'},503);
   if(url.pathname==='/api/public/config'&&request.method==='GET'){
-    return json({organization:data.org_name,rooms:(data.state.rooms||[]).map(r=>({id:r.id,name:r.name,type:r.type,capacity:r.capacity||1,note:r.note||''}))});
+    return json({organization:data.org_name,mode:bookingMode(data.state),rooms:(data.state.rooms||[]).map(r=>({id:r.id,name:r.name,type:r.type,capacity:r.capacity||1,note:r.note||''}))});
   }
   if(url.pathname==='/api/public/availability'&&request.method==='POST'){
     const b=await body(request);const from=date(b.from),to=date(b.to);if(!from||!to||to<from)return json({error:'Bitte einen gültigen Zeitraum wählen.'},400);
@@ -38,15 +60,21 @@ async function handlePublic(request,env,url){
     const name=text(b.name,120),email=text(b.email,180),phone=text(b.phone,80),roomId=text(b.roomId,100),from=date(b.from),to=date(b.to),purpose=text(b.purpose,180),note=text(b.note,600),participants=Math.max(1,Math.min(999,Number(b.participants)||1));
     if(!name||!email||!roomId||!from||!to||to<from)return json({error:'Bitte alle Pflichtfelder ausfüllen.'},400);
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return json({error:'Bitte eine gültige E-Mail-Adresse angeben.'},400);
-    if(!(data.state.rooms||[]).some(r=>r.id===roomId))return json({error:'Raum nicht gefunden.'},404);
+    const room=(data.state.rooms||[]).find(r=>r.id===roomId);if(!room)return json({error:'Raum nicht gefunden.'},404);
+    if(participants>Number(room.capacity||1))return json({error:'Die Teilnehmerzahl überschreitet die Kapazität des gewählten Raums.'},400);
     if(!available(data.state,roomId,from,to))return json({error:'Der gewünschte Zeitraum ist inzwischen nicht mehr verfügbar.'},409);
     for(let attempt=0;attempt<3;attempt++){
       const fresh=attempt?await loadOrgState(env):data;if(!fresh)return json({error:'Daten nicht verfügbar.'},503);
       if(!available(fresh.state,roomId,from,to))return json({error:'Der gewünschte Zeitraum ist inzwischen nicht mehr verfügbar.'},409);
-      fresh.state.bookingRequests=Array.isArray(fresh.state.bookingRequests)?fresh.state.bookingRequests:[];
-      fresh.state.bookingRequests.push({id:crypto.randomUUID(),name,email,phone,roomId,from,to,purpose,participants,note,status:'new',createdAt:new Date().toISOString(),source:'public'});
+      const payload={name,email,phone,roomId,from,to,purpose,participants,note};
+      const mode=bookingMode(fresh.state);
+      if(mode==='direct')addDirectBooking(fresh.state,payload);
+      else {
+        fresh.state.bookingRequests=Array.isArray(fresh.state.bookingRequests)?fresh.state.bookingRequests:[];
+        fresh.state.bookingRequests.push({id:crypto.randomUUID(),...payload,status:'new',createdAt:new Date().toISOString(),source:'public'});
+      }
       const result=await env.DB.prepare('UPDATE app_state SET data=?,version=version+1,updated_at=? WHERE org_id=? AND version=?').bind(JSON.stringify(fresh.state),new Date().toISOString(),fresh.org_id,fresh.version).run();
-      if(Number(result.meta?.changes||0)===1)return json({ok:true,message:'Buchungsanfrage wurde gesendet.'},201);
+      if(Number(result.meta?.changes||0)===1)return mode==='direct'?json({ok:true,mode,message:'Die Buchung wurde verbindlich bestätigt.'},201):json({ok:true,mode,message:'Buchungsanfrage wurde gesendet.'},201);
     }
     return json({error:'Die Daten wurden gleichzeitig geändert. Bitte erneut senden.'},409);
   }
