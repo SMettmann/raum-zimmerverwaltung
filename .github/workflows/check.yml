@@ -1,0 +1,24 @@
+name: Code Check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: JavaScript syntax
+        run: |
+          node --check core.js
+          node --check manage.js
+          node --check worker/index.js
+      - name: Install Wrangler
+        run: npm install
+      - name: Wrangler dry run
+        run: npx wrangler deploy --dry-run
