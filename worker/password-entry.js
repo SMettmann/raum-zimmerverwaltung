@@ -16,6 +16,7 @@ export default {
       if(!next.includes('cleaning-history-expand.js'))next=next.replace('</body>','<script src="cleaning-history-expand.js"></script></body>');
       if(!next.includes('live-test-fixes.js'))next=next.replace('</body>','<script src="live-test-fixes.js"></script></body>');
       if(!next.includes('task-history-undo.js'))next=next.replace('</body>','<script src="task-history-undo.js"></script></body>');
+      if(!next.includes('live-test-fixes-round-two.js'))next=next.replace('</body>','<script src="live-test-fixes-round-two.js"></script></body>');
       if(next===html)return new Response(html,{status:response.status,headers:response.headers});
       const headers=new Headers(response.headers);headers.delete('Content-Length');
       return new Response(next,{status:response.status,statusText:response.statusText,headers});
