@@ -1,5 +1,7 @@
 const fs=require('fs');
 const code=fs.readFileSync('cleaning-v2.js','utf8');
+const historyExpand=fs.readFileSync('cleaning-history-expand.js','utf8');
+const passwordEntry=fs.readFileSync('worker/password-entry.js','utf8');
 const required=[
   'Zu reinigen',
   'Kommende Reinigungen',
@@ -18,4 +20,8 @@ if(!code.includes("rooms.forEach(r=>"))throw new Error('Raum-Synchronisierung fe
 if(!code.includes("cleaningPlans.find(j=>j.bookingId===b.id)"))throw new Error('Buchungs-Synchronisierung fehlt');
 if(!code.includes("if(j.status==='doing')"))throw new Error('Migration alter In-Reinigung-Zustände fehlt');
 if(!code.includes("cleaningPlans.filter(j=>j.status==='done')"))throw new Error('Reinigungshistorie muss aus erledigten Reinigungen erzeugt werden');
-console.log('Cleaning confirm-only + history smoke test OK');
+for(const text of ['all.slice(0,20)','Alle anzeigen','Weniger anzeigen','cleaningV2HistoryAllButton']){
+  if(!historyExpand.includes(text))throw new Error('Aufklappbare Reinigungshistorie fehlt: '+text);
+}
+if(!passwordEntry.includes('cleaning-history-expand.js'))throw new Error('Historien-Erweiterung wird im Live-Worker nicht geladen');
+console.log('Cleaning confirm-only + full history smoke test OK');
