@@ -3,7 +3,7 @@
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.RaumwerkXRechnung=api;
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
-  function xmlEsc(v){return String(v??'').replace(/[<>&'\"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&apos;','"':'&quot;'}[c]))}
+  function xmlEsc(v){return String(v??'').replace(/[<>&'\"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp',"'":'&apos;','"':'&quot;'}[c]))}
   function requireFields(invoice,billing,settings){
     const fields=[
       ['Rechnungsnummer',invoice.number],['Rechnungsdatum',invoice.issueDate],['Fälligkeitsdatum',invoice.dueDate],
@@ -127,6 +127,12 @@ if(typeof window!=='undefined'&&typeof document!=='undefined'){
       availabilityScript.src='availability-simple.js';
       availabilityScript.dataset.availabilitySimple='1';
       document.body.appendChild(availabilityScript);
+    }
+    if(!document.querySelector('script[src$="time-booking.js"]')){
+      const timeScript=document.createElement('script');
+      timeScript.src='time-booking.js';
+      timeScript.dataset.timeBooking='1';
+      document.body.appendChild(timeScript);
     }
   });
 }
