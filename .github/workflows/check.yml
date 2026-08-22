@@ -21,6 +21,7 @@ jobs:
           node --check cleaning-v2.js
           node --check completion.js
           node --check availability-simple.js
+          node --check time-booking.js
           node --check manage.js
           node --check public-booking.js
           node --check tests/generate-xrechnung-sample.cjs
@@ -31,8 +32,11 @@ jobs:
           node --check tests/admin-audit-ui-smoke.mjs
           node --check tests/public-rate-limit-smoke.mjs
           node --check tests/simple-blocking-smoke.cjs
+          node --check tests/time-booking-smoke.mjs
           node --check worker/index.js
           node --check worker/entry.js
+          node --check worker/time-entry.js
+          node --check worker/time-booking.mjs
           node --check worker/state-permissions.mjs
           node --check worker/public-rate-limit.mjs
       - name: Cleaning V2 smoke test
@@ -49,6 +53,8 @@ jobs:
         run: node tests/public-rate-limit-smoke.mjs
       - name: Simple blocking smoke test
         run: node tests/simple-blocking-smoke.cjs
+      - name: Timed seminar booking smoke test
+        run: node tests/time-booking-smoke.mjs
       - name: Install Wrangler
         run: npm install
       - name: Wrangler dry run
