@@ -52,8 +52,10 @@ globalThis.fetch=originalFetch;
 const schema=fs.readFileSync(new URL('../schema.sql',import.meta.url),'utf8');
 const wrangler=fs.readFileSync(new URL('../wrangler.jsonc',import.meta.url),'utf8');
 const entry=fs.readFileSync(new URL('../worker/email-entry.js',import.meta.url),'utf8');
+const passwordEntry=fs.readFileSync(new URL('../worker/password-entry.js',import.meta.url),'utf8');
 assert.match(schema,/CREATE TABLE IF NOT EXISTS email_log/);
-assert.match(wrangler,/worker\/email-entry\.js/);
+assert.match(wrangler,/worker\/password-entry\.js/);
+assert.match(passwordEntry,/import app from '\.\/email-entry\.js'/);
 assert.match(entry,/confirmationCandidates/);
 assert.match(entry,/sendBookingConfirmationOnce/);
 
