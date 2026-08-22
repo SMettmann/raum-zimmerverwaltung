@@ -1,4 +1,5 @@
 import app from './index.js';
+import { canWriteExtendedState } from './state-permissions.mjs';
 
 export default {
   async fetch(request, env, ctx) {
@@ -7,9 +8,45 @@ export default {
       try { return await handlePublic(request, env, url); }
       catch (e) { console.error('public_api_error', e); return json({error:'Anfrage konnte nicht verarbeitet werden.'},500); }
     }
+    if(url.pathname==='/api/state'&&request.method==='PUT'){
+      try{
+        const denied=await enforceExtendedStatePermissions(request,env);
+        if(denied)return denied;
+      }catch(e){console.error('extended_permission_error',e);return json({error:'Berechtigung konnte nicht geprüft werden.'},500)}
+    }
     return app.fetch(request, env, ctx);
   }
 };
+
+async function enforceExtendedStatePermissions(request,env){
+  const user=await userFromSession(request,env);if(!user)return null;
+  if(user.role==='admin'||user.role==='manager')return null;
+  if(user.role==='viewer')return json({error:'Für diese Änderung fehlen die Rechte.'},403);
+  let payload;try{payload=await request.clone().json()}catch{return null}
+  if(!payload?.state)return null;
+  const current=await env.DB.prepare('SELECT data FROM app_state WHERE org_id=?').bind(user.org_id).first();
+  if(!current)return null;
+  let before;try{before=JSON.parse(current.data)}catch{return json({error:'Aktueller Datenstand ist ungültig.'},500)}
+  if(!canWriteExtendedState(user.role,before,payload.state))return json({error:'Für diese Änderung fehlen die Rechte.'},403);
+  return null;
+}
+async function userFromSession(request,env){
+  const token=getCookie(request,'raumwerk_session');if(!token)return null;
+  const tokenHash=await sha256(token);
+  const row=await env.DB.prepare(`SELECT u.id,u.org_id,u.role,u.active,s.expires_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=?`).bind(tokenHash).first();
+  if(!row||!row.active||row.expires_at<=new Date().toISOString())return null;
+  return row;
+}
+function getCookie(request,name){
+  const cookies=request.headers.get('Cookie')||'';
+  for(const part of cookies.split(';')){const [key,...rest]=part.trim().split('=');if(key===name)return rest.join('=')}
+  return '';
+}
+async function sha256(value){
+  const bytes=new TextEncoder().encode(value);
+  const hash=new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));
+  return [...hash].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
 
 async function loadOrgState(env){
   const row=await env.DB.prepare(`SELECT o.id AS org_id,o.name AS org_name,s.version,s.data FROM organizations o JOIN app_state s ON s.org_id=o.id ORDER BY o.created_at LIMIT 1`).first();
