@@ -12,7 +12,7 @@
     {
       "binding": "DB",
       "database_name": "raumwerk-db",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+      "database_id": "30f40d5d-402f-4f7a-90cf-56027e3b2934"
     }
   ],
   "observability": {
