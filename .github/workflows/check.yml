@@ -21,6 +21,7 @@ jobs:
           node --check cleaning-v2.js
           node --check cleaning-history-expand.js
           node --check live-test-fixes.js
+          node --check live-test-fixes-round-two.js
           node --check completion.js
           node --check availability-simple.js
           node --check time-booking.js
@@ -30,6 +31,7 @@ jobs:
           node --check tests/generate-xrechnung-sample.cjs
           node --check tests/cleaning-v2-smoke.cjs
           node --check tests/live-test-round-one-smoke.cjs
+          node --check tests/live-test-round-two-smoke.cjs
           node --check tests/requirements-complete-smoke.cjs
           node --check tests/production-safety-smoke.mjs
           node --check tests/login-audit-smoke.mjs
@@ -52,6 +54,8 @@ jobs:
         run: node tests/cleaning-v2-smoke.cjs
       - name: Live test round one smoke test
         run: node tests/live-test-round-one-smoke.cjs
+      - name: Live test round two smoke test
+        run: node tests/live-test-round-two-smoke.cjs
       - name: Tender requirements smoke test
         run: node tests/requirements-complete-smoke.cjs
       - name: Production safety smoke test
