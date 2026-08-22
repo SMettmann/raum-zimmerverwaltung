@@ -116,10 +116,17 @@ if(typeof document!=='undefined'&&typeof RaumwerkXRechnung!=='undefined'){
 
 if(typeof window!=='undefined'&&typeof document!=='undefined'){
   window.addEventListener('load',()=>{
-    if(document.querySelector('script[data-cleaning-v2]'))return;
-    const script=document.createElement('script');
-    script.src='cleaning-v2.js';
-    script.dataset.cleaningV2='1';
-    document.body.appendChild(script);
+    if(!document.querySelector('script[src$="cleaning-v2.js"]')){
+      const cleaningScript=document.createElement('script');
+      cleaningScript.src='cleaning-v2.js';
+      cleaningScript.dataset.cleaningV2='1';
+      document.body.appendChild(cleaningScript);
+    }
+    if(!document.querySelector('script[src$="availability-simple.js"]')){
+      const availabilityScript=document.createElement('script');
+      availabilityScript.src='availability-simple.js';
+      availabilityScript.dataset.availabilitySimple='1';
+      document.body.appendChild(availabilityScript);
+    }
   });
 }
