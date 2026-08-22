@@ -32,6 +32,7 @@ const publicHtml=fs.readFileSync('booking.html','utf8');
 const publicJs=fs.readFileSync('public-booking.js','utf8');
 const worker=fs.readFileSync('worker/time-entry.js','utf8');
 const emailEntry=fs.readFileSync('worker/email-entry.js','utf8');
+const passwordEntry=fs.readFileSync('worker/password-entry.js','utf8');
 const wrangler=fs.readFileSync('wrangler.jsonc','utf8');
 const xrechnung=fs.readFileSync('xrechnung.js','utf8');
 for(const token of ['bookingFromTime','bookingToTime','Teilnehmerzahl','Seminarraum','Besprechungsraum','Veranstaltungsraum'])assert.ok(browser.includes(token),`Browser-Zeitlogik fehlt: ${token}`);
@@ -39,7 +40,8 @@ assert.ok(publicHtml.includes('Gästezimmer werden weiterhin tagesweise gebucht.
 assert.ok(publicHtml.includes('id="fromTime"')&&publicHtml.includes('id="toTime"'));
 assert.ok(publicJs.includes('fromTime')&&publicJs.includes('toTime'));
 assert.ok(worker.includes('roomAvailable')&&worker.includes('validTimedRange'));
-assert.ok(wrangler.includes('"main": "./worker/email-entry.js"'));
+assert.ok(wrangler.includes('"main": "./worker/password-entry.js"'));
+assert.ok(passwordEntry.includes("import app from './email-entry.js'"),'Der Passwort-Wrapper muss die E-Mail-Schicht weiterverwenden.');
 assert.ok(emailEntry.includes("import app from './time-entry.js'"),'Der E-Mail-Wrapper muss die Zeitbuchungs-API weiterverwenden.');
 assert.ok(xrechnung.includes("'&':'&amp;'"),'XRechnung XML-Escaping muss unverändert korrekt bleiben.');
 console.log('Timed seminar booking smoke test passed.');
