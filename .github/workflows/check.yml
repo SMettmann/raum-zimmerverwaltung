@@ -27,6 +27,7 @@ jobs:
           node --check tests/requirements-complete-smoke.cjs
           node --check tests/production-safety-smoke.mjs
           node --check tests/login-audit-smoke.mjs
+          node --check tests/admin-audit-ui-smoke.mjs
           node --check worker/index.js
           node --check worker/entry.js
           node --check worker/state-permissions.mjs
@@ -38,6 +39,8 @@ jobs:
         run: node tests/production-safety-smoke.mjs
       - name: Login and audit smoke test
         run: node tests/login-audit-smoke.mjs
+      - name: Admin and audit UI smoke test
+        run: node tests/admin-audit-ui-smoke.mjs
       - name: Install Wrangler
         run: npm install
       - name: Wrangler dry run
