@@ -65,3 +65,19 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 CREATE INDEX IF NOT EXISTS idx_audit_org_created ON audit_log(org_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);
+
+CREATE TABLE IF NOT EXISTS email_log (
+  event_key TEXT PRIMARY KEY,
+  org_id TEXT NOT NULL,
+  booking_id TEXT NOT NULL,
+  recipient TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('sent','failed')),
+  provider_id TEXT,
+  error TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY(org_id) REFERENCES organizations(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_log_org_created ON email_log(org_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_email_log_booking ON email_log(booking_id);
