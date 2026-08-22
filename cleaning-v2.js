@@ -28,6 +28,11 @@ function setupCleaningV2Ui(){
         <div class="panel-head"><div><h2>Saubere Räume</h2><div class="muted">Aktuell kein Reinigungsbedarf.</div></div></div>
         <div id="cleaningV2CleanRooms"></div>
       </div>
+    </div>
+
+    <div class="panel cleaning-v2-history" style="margin-top:18px">
+      <div class="panel-head"><div><h2>Reinigungshistorie</h2><div class="muted">Die letzten bestätigten Reinigungen mit Zeitpunkt und Mitarbeiter.</div></div></div>
+      <div id="cleaningV2HistoryList"></div>
     </div>`;
 
   if(!document.getElementById('cleaningV2Style')){
@@ -43,7 +48,9 @@ function setupCleaningV2Ui(){
       .clean-v2-state.due{background:#fff0e8;color:#a94b19}.clean-v2-state.overdue{background:#ffeded;color:#a12222}.clean-v2-state.done{background:#e8f8ef;color:#167247}
       .clean-v2-clean-grid{display:flex;flex-wrap:wrap;gap:8px}.clean-v2-clean-pill{padding:8px 11px;border-radius:10px;background:#eef9f3;color:#176a45;font-size:12px;font-weight:800;border:1px solid #d9f0e3}
       .clean-v2-upcoming-row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:13px 0;border-top:1px solid var(--line)}.clean-v2-upcoming-row:first-child{border-top:0}
-      @media(max-width:850px){.clean-v2-row{grid-template-columns:1fr;gap:8px}.clean-v2-action{justify-content:flex-start}.clean-v2-bottom{grid-template-columns:1fr!important}}
+      .clean-v2-history-row{display:grid;grid-template-columns:minmax(145px,.8fr) minmax(220px,1.2fr) minmax(180px,1fr);gap:16px;align-items:center;padding:13px 0;border-top:1px solid var(--line)}.clean-v2-history-row:first-child{border-top:0}
+      .clean-v2-history-date{font-weight:800;font-size:13px}.clean-v2-history-room{font-weight:800}.clean-v2-history-user{font-size:13px;color:#59657a}
+      @media(max-width:850px){.clean-v2-row{grid-template-columns:1fr;gap:8px}.clean-v2-action{justify-content:flex-start}.clean-v2-bottom{grid-template-columns:1fr!important}.clean-v2-history-row{grid-template-columns:1fr;gap:4px}}
     `;
     document.head.appendChild(style);
   }
@@ -53,6 +60,14 @@ function cleaningActiveBookings(){return bookings.filter(b=>b.status!=='cancelle
 function cleaningJobDue(job){return job.status!=='done'&&job.date&&job.date<=todayIso()}
 function cleaningJobUpcoming(job){return job.status!=='done'&&job.date>todayIso()}
 function cleaningDoneToday(job){return job.status==='done'&&((job.completedAt||'').slice(0,10)===todayIso()||(!job.completedAt&&job.date===todayIso()))}
+function cleaningCompletedBy(job){return job.completedBy||job.owner||'Nicht angegeben'}
+function cleaningHistoryStamp(job){
+  if(job.completedAt){
+    const d=new Date(job.completedAt);
+    if(!Number.isNaN(d.getTime()))return {date:new Intl.DateTimeFormat('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}).format(d),time:new Intl.DateTimeFormat('de-DE',{hour:'2-digit',minute:'2-digit'}).format(d)};
+  }
+  return {date:fmtDate(job.date),time:job.time||''};
+}
 
 function reconcileCleaningData(){
   const today=todayIso();
@@ -115,6 +130,7 @@ function renderCleaningV2(){
   const due=cleaningPlans.filter(cleaningJobDue).sort(cleaningSort);
   const upcoming=cleaningPlans.filter(cleaningJobUpcoming).sort(cleaningSort);
   const doneToday=cleaningPlans.filter(cleaningDoneToday);
+  const history=cleaningPlans.filter(j=>j.status==='done').sort((a,b)=>String(b.completedAt||b.date||'').localeCompare(String(a.completedAt||a.date||''))).slice(0,20);
   const roomsWithCurrentNeed=new Set(due.map(j=>j.roomId));
   const cleanRooms=rooms.filter(r=>r.cleaning==='done'&&!roomsWithCurrentNeed.has(r.id));
 
@@ -136,13 +152,19 @@ function renderCleaningV2(){
 
   const cleanWrap=document.getElementById('cleaningV2CleanRooms');
   if(cleanWrap)cleanWrap.innerHTML=cleanRooms.length?`<div class="clean-v2-clean-grid">${cleanRooms.map(r=>`<span class="clean-v2-clean-pill">✓ ${esc(r.name)}</span>`).join('')}</div>`:'<div class="empty">Aktuell ist noch kein Raum als sauber markiert.</div>';
+
+  const historyWrap=document.getElementById('cleaningV2HistoryList');
+  if(historyWrap)historyWrap.innerHTML=history.length?history.map(job=>{
+    const stamp=cleaningHistoryStamp(job);
+    return `<div class="clean-v2-history-row"><div class="clean-v2-history-date">${esc(stamp.date)}${stamp.time?' · '+esc(stamp.time):''}</div><div class="clean-v2-history-room">✓ ${esc(roomName(job.roomId))}</div><div class="clean-v2-history-user">gereinigt von <strong>${esc(cleaningCompletedBy(job))}</strong></div></div>`;
+  }).join(''):'<div class="empty">Noch keine abgeschlossene Reinigung vorhanden.</div>';
 }
 
 function cleaningSort(a,b){return String(a.date||'9999').localeCompare(String(b.date||'9999'))||String(a.time||'').localeCompare(String(b.time||''))||roomName(a.roomId).localeCompare(roomName(b.roomId))}
 
 function finishCleaningJob(id){
   const job=cleaningPlans.find(j=>j.id===id);if(!job)return;
-  job.status='done';job.completedAt=new Date().toISOString();delete job.startedAt;
+  job.status='done';job.completedAt=new Date().toISOString();job.completedBy=window.raumwerkCloud?.user?.name||job.owner||'Nicht angegeben';job.completedByUserId=window.raumwerkCloud?.user?.id||'';delete job.startedAt;
   const otherActive=cleaningPlans.some(j=>j.id!==id&&j.roomId===job.roomId&&j.status!=='done'&&j.date<=todayIso());
   rooms=rooms.map(r=>r.id===job.roomId?{...r,cleaning:otherActive?'open':'done'}:r);
   persist();renderAll();toast('Sauber bestätigt');
@@ -163,7 +185,7 @@ function deleteCleaningV2Job(id){
 setCleaningPlanStatus=function(id,status){
   if(status==='done')return finishCleaningJob(id);
   const job=cleaningPlans.find(j=>j.id===id);if(!job)return;
-  job.status='planned';delete job.startedAt;delete job.completedAt;
+  job.status='planned';delete job.startedAt;delete job.completedAt;delete job.completedBy;delete job.completedByUserId;
   rooms=rooms.map(r=>r.id===job.roomId?{...r,cleaning:'open'}:r);persist();renderAll();
 };
 
@@ -171,8 +193,8 @@ setCleaning=function(id,status){
   const today=todayIso();
   let job=cleaningPlans.find(j=>j.roomId===id&&j.status!=='done'&&j.date<=today);
   if(status==='done'){
-    if(job)return finishCleaningJob(job.id);
-    rooms=rooms.map(r=>r.id===id?{...r,cleaning:'done'}:r);persist();renderAll();return;
+    if(!job){job={id:uid(),bookingId:'',roomId:id,date:today,time:'',owner:'',note:'Reinigungsbedarf manuell gesetzt',status:'planned',auto:false,source:'room-status'};cleaningPlans.push(job)}
+    return finishCleaningJob(job.id);
   }
   if(!job){job={id:uid(),bookingId:'',roomId:id,date:today,time:'',owner:'',note:'Reinigungsbedarf manuell gesetzt',status:'planned',auto:false,source:'room-status'};cleaningPlans.push(job)}
   job.status='planned';rooms=rooms.map(r=>r.id===id?{...r,cleaning:'open'}:r);persist();renderAll();
