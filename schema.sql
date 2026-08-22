@@ -41,3 +41,14 @@ CREATE TABLE IF NOT EXISTS app_state (
   FOREIGN KEY(org_id) REFERENCES organizations(id) ON DELETE CASCADE,
   FOREIGN KEY(updated_by) REFERENCES users(id) ON DELETE SET NULL
 );
+
+CREATE TABLE IF NOT EXISTS login_attempts (
+  id TEXT PRIMARY KEY,
+  ip_hash TEXT NOT NULL,
+  pair_hash TEXT NOT NULL,
+  attempted_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip_hash, attempted_at);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_pair ON login_attempts(pair_hash, attempted_at);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_time ON login_attempts(attempted_at);
