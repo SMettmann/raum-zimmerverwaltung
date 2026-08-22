@@ -6,6 +6,15 @@ const PBKDF2_ITERATIONS=210000;
 export default {
   async fetch(request,env,ctx){
     const url=new URL(request.url);
+    if(request.method==='GET'&&(url.pathname==='/'||url.pathname==='/index.html')){
+      const response=await app.fetch(request,env,ctx);
+      const type=response.headers.get('Content-Type')||'';
+      if(!response.ok||!type.includes('text/html'))return response;
+      const html=await response.text();
+      if(html.includes('password-management.js'))return new Response(html,{status:response.status,headers:response.headers});
+      const headers=new Headers(response.headers);headers.delete('Content-Length');
+      return new Response(html.replace('</body>','<script src="password-management.js"></script></body>'),{status:response.status,statusText:response.statusText,headers});
+    }
     if(url.pathname==='/api/password/change'&&request.method==='POST'){
       if(!sameOrigin(request,url))return json({error:'Ungültiger Ursprung.'},403);
       try{return await changeOwnPassword(request,env)}
