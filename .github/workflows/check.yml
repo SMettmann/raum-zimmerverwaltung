@@ -28,9 +28,11 @@ jobs:
           node --check tests/production-safety-smoke.mjs
           node --check tests/login-audit-smoke.mjs
           node --check tests/admin-audit-ui-smoke.mjs
+          node --check tests/public-rate-limit-smoke.mjs
           node --check worker/index.js
           node --check worker/entry.js
           node --check worker/state-permissions.mjs
+          node --check worker/public-rate-limit.mjs
       - name: Cleaning V2 smoke test
         run: node tests/cleaning-v2-smoke.cjs
       - name: Tender requirements smoke test
@@ -41,6 +43,8 @@ jobs:
         run: node tests/login-audit-smoke.mjs
       - name: Admin and audit UI smoke test
         run: node tests/admin-audit-ui-smoke.mjs
+      - name: Public booking rate limit smoke test
+        run: node tests/public-rate-limit-smoke.mjs
       - name: Install Wrangler
         run: npm install
       - name: Wrangler dry run

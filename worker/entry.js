@@ -1,5 +1,6 @@
 import app from './index.js';
 import { canWriteExtendedState } from './state-permissions.mjs';
+import { consumePublicBookingAttempt } from './public-rate-limit.mjs';
 
 const LOGIN_MAX_ATTEMPTS=8;
 const LOGIN_WINDOW_MS=15*60*1000;
@@ -179,6 +180,8 @@ async function handlePublic(request,env,url){
     return json({rooms:(data.state.rooms||[]).filter(r=>available(data.state,r.id,from,to)).map(r=>r.id)});
   }
   if(url.pathname==='/api/public/request'&&request.method==='POST'){
+    const limit=await consumePublicBookingAttempt(env,request);
+    if(!limit.allowed)return json({error:'Zu viele Buchungsanfragen in kurzer Zeit. Bitte später erneut versuchen.',code:'PUBLIC_RATE_LIMIT'},429,{'Retry-After':String(limit.retryAfterSeconds)});
     const b=await body(request);if(b.website)return json({ok:true},202);
     const name=text(b.name,120),email=text(b.email,180),phone=text(b.phone,80),roomId=text(b.roomId,100),from=date(b.from),to=date(b.to),purpose=text(b.purpose,180),note=text(b.note,600),participants=Math.max(1,Math.min(999,Number(b.participants)||1));
     if(!name||!email||!roomId||!from||!to||to<from)return json({error:'Bitte alle Pflichtfelder ausfüllen.'},400);
