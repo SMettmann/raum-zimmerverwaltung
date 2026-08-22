@@ -4,9 +4,12 @@ const required=[
   'Zu reinigen',
   'Kommende Reinigungen',
   'Saubere Räume',
+  'Reinigungshistorie',
   'Sauber bestätigen ✓',
   'Reinigungsbedarf manuell gesetzt',
-  'Automatisch nach Buchungsende'
+  'Automatisch nach Buchungsende',
+  'completedBy',
+  'window.raumwerkCloud?.user?.name'
 ];
 for(const text of required){if(!code.includes(text))throw new Error('Fehlt in Reinigung V2: '+text)}
 if(code.includes('Reinigung starten'))throw new Error('Zwischenaktion „Reinigung starten“ darf nicht mehr im UI vorkommen');
@@ -14,4 +17,5 @@ if(code.includes('Reinigung läuft'))throw new Error('Zwischenstatus „Reinigun
 if(!code.includes("rooms.forEach(r=>"))throw new Error('Raum-Synchronisierung fehlt');
 if(!code.includes("cleaningPlans.find(j=>j.bookingId===b.id)"))throw new Error('Buchungs-Synchronisierung fehlt');
 if(!code.includes("if(j.status==='doing')"))throw new Error('Migration alter In-Reinigung-Zustände fehlt');
-console.log('Cleaning confirm-only smoke test OK');
+if(!code.includes("cleaningPlans.filter(j=>j.status==='done')"))throw new Error('Reinigungshistorie muss aus erledigten Reinigungen erzeugt werden');
+console.log('Cleaning confirm-only + history smoke test OK');
