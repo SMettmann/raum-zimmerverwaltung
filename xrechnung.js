@@ -128,5 +128,11 @@ if(typeof window!=='undefined'&&typeof document!=='undefined'){
       availabilityScript.dataset.availabilitySimple='1';
       document.body.appendChild(availabilityScript);
     }
+    if(!document.querySelector('script[src$="time-booking.js"]')){
+      const timeScript=document.createElement('script');
+      timeScript.src='time-booking.js';
+      timeScript.dataset.timeBooking='1';
+      document.body.appendChild(timeScript);
+    }
   });
 }
