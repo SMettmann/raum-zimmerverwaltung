@@ -105,8 +105,48 @@
   const completionRenderOnlineRequests=renderOnlineRequests;
   renderOnlineRequests=function(){setupOnlineUi();completionRenderOnlineRequests();renderOnlineRequirementConfig()};
 
+  // Produktionsschutz: vollständige Backups, keine gefährlichen lokalen Werkzeuge im gemeinsamen Cloudbetrieb.
+  exportData=function(){
+    const snapshot={version:2,exportedAt:new Date().toISOString(),...stateSnapshot()};
+    downloadFile('raumwerk-sicherung-'+todayIso()+'.json',JSON.stringify(snapshot,null,2),'application/json');
+    toast('Vollständige Datensicherung erstellt');
+  };
+
+  const localDemoData=loadDemoData;
+  loadDemoData=function(){
+    if(cloud.mode==='online')return alert('Demo-Daten sind im gemeinsamen Onlinebetrieb aus Sicherheitsgründen deaktiviert.');
+    return localDemoData();
+  };
+  const localImportData=importData;
+  importData=function(event){
+    if(cloud.mode==='online'){
+      if(event?.target)event.target.value='';
+      return alert('Das Einlesen einer lokalen Sicherung ist im gemeinsamen Onlinebetrieb deaktiviert. So kann der zentrale Datenstand nicht versehentlich überschrieben werden.');
+    }
+    return localImportData(event);
+  };
+  const localResetAllData=resetAllData;
+  resetAllData=function(){
+    if(cloud.mode==='online')return alert('Ein Komplett-Reset ist im gemeinsamen Onlinebetrieb gesperrt.');
+    return localResetAllData();
+  };
+
+  function applyProductionSafetyUi(){
+    const panels=[...document.querySelectorAll('#page-settings .panel')];
+    const panel=panels.find(p=>(p.querySelector('h2')?.textContent||'').includes('Daten'));
+    if(!panel||cloud.mode!=='online'||panel.dataset.productionSafe==='1')return;
+    panel.dataset.productionSafe='1';
+    panel.innerHTML=`<h2 style="margin-bottom:12px">Daten & Sicherung</h2><p class="muted">RAUMWERK arbeitet hier mit dem gemeinsamen zentralen Datenstand. Demo-Daten, lokaler Import und Komplett-Reset sind im Onlinebetrieb bewusst deaktiviert.</p><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button class="btn" onclick="exportData()">Vollständige Datensicherung</button></div><div class="notice" style="margin-top:16px">Damit kann kein Benutzer versehentlich die gemeinsamen Produktivdaten durch Test- oder lokale Daten ersetzen.</div>`;
+  }
+
+  const safetyRenderPage=renderPage;
+  renderPage=function(page){safetyRenderPage(page);if(page==='settings')applyProductionSafetyUi()};
+  const safetyLoadCloudState=loadCloudState;
+  loadCloudState=async function(){const result=await safetyLoadCloudState();applyProductionSafetyUi();return result};
+
   setupAvailabilityUi();
   setupOnlineUi();
   renderAvailability();
   renderOnlineRequirementConfig();
+  applyProductionSafetyUi();
 })();

@@ -25,12 +25,16 @@ jobs:
           node --check tests/generate-xrechnung-sample.cjs
           node --check tests/cleaning-v2-smoke.cjs
           node --check tests/requirements-complete-smoke.cjs
+          node --check tests/production-safety-smoke.mjs
           node --check worker/index.js
           node --check worker/entry.js
+          node --check worker/state-permissions.mjs
       - name: Cleaning V2 smoke test
         run: node tests/cleaning-v2-smoke.cjs
       - name: Tender requirements smoke test
         run: node tests/requirements-complete-smoke.cjs
+      - name: Production safety smoke test
+        run: node tests/production-safety-smoke.mjs
       - name: Install Wrangler
         run: npm install
       - name: Wrangler dry run
