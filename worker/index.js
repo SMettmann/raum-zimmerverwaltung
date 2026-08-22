@@ -1,6 +1,6 @@
 const enc = new TextEncoder();
 const SESSION_DAYS = 14;
-const PBKDF2_ITERATIONS = 210000;
+const PBKDF2_ITERATIONS = 100000;
 const ROLES = new Set(['admin','manager','staff','cleaning','viewer']);
 
 export default {
