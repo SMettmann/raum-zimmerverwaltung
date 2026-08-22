@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "raumwerk",
-  "main": "./worker/time-entry.js",
+  "main": "./worker/email-entry.js",
   "compatibility_date": "2026-08-21",
   "assets": {
     "directory": ".",
