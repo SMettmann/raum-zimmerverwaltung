@@ -7,10 +7,10 @@ const wrangler=fs.readFileSync('wrangler.jsonc','utf8');
 
 for(const token of [
   '/api/password/change',
-  '/api/users/',
+  'users\\/([^/]+)\\/password',
   'verifyPassword(currentPassword',
   "actor.role!=='admin'",
-  'password.length',
+  'newPassword.length<10',
   'PBKDF2_ITERATIONS=210000',
   "DELETE FROM sessions WHERE user_id=? AND token_hash<>?",
   "DELETE FROM sessions WHERE user_id=?",
