@@ -3,7 +3,7 @@
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.RaumwerkXRechnung=api;
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
-  function xmlEsc(v){return String(v??'').replace(/[<>&'\"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp',"'":'&apos;','"':'&quot;'}[c]))}
+  function xmlEsc(v){return String(v??'').replace(/[<>&'\"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&apos;','"':'&quot;'}[c]))}
   function requireFields(invoice,billing,settings){
     const fields=[
       ['Rechnungsnummer',invoice.number],['Rechnungsdatum',invoice.issueDate],['Fälligkeitsdatum',invoice.dueDate],
