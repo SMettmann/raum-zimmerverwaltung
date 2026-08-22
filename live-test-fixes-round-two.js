@@ -21,6 +21,8 @@
       html[data-role="staff"] #page-settings .settings-grid>.panel:nth-child(2),
       html[data-role="staff"] #billingSettingsPanel,
       html[data-role="staff"] #cloudAuditPanel,
+      html[data-role="staff"] #page-invoices .toolbar .btn.primary,
+      html[data-role="staff"] #page-invoices .req-actions button:not(.view-only),
       html[data-role="viewer"] #page-settings .settings-grid>.panel:nth-child(1),
       html[data-role="viewer"] #page-settings .settings-grid>.panel:nth-child(2),
       html[data-role="viewer"] #billingSettingsPanel,
