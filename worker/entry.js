@@ -1,5 +1,6 @@
 import app from './index.js';
 import { canWriteExtendedState } from './state-permissions.mjs';
+import { checkLoginRateLimit, recordLoginFailure, clearLoginFailures, requestIp, loginEmail } from './login-rate-limit.mjs';
 
 export default {
   async fetch(request, env, ctx) {
@@ -7,6 +8,9 @@ export default {
     if (url.pathname.startsWith('/api/public/')) {
       try { return await handlePublic(request, env, url); }
       catch (e) { console.error('public_api_error', e); return json({error:'Anfrage konnte nicht verarbeitet werden.'},500); }
+    }
+    if(url.pathname==='/api/login'&&request.method==='POST'){
+      return handleRateLimitedLogin(request,env,ctx);
     }
     if(url.pathname==='/api/state'&&request.method==='PUT'){
       try{
@@ -17,6 +21,26 @@ export default {
     return app.fetch(request, env, ctx);
   }
 };
+
+async function handleRateLimitedLogin(request,env,ctx){
+  const ip=requestIp(request),email=await loginEmail(request);
+  try{
+    const limit=await checkLoginRateLimit(env,{ip,email});
+    if(!limit.allowed){
+      return new Response(JSON.stringify({error:'Zu viele fehlgeschlagene Anmeldeversuche. Bitte in 15 Minuten erneut versuchen.',code:'LOGIN_RATE_LIMIT'}),{
+        status:429,
+        headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Retry-After':String(limit.retryAfterSeconds),'X-Content-Type-Options':'nosniff'}
+      });
+    }
+  }catch(e){console.warn('login_rate_limit_check_failed',e?.message||String(e))}
+
+  const response=await app.fetch(request,env,ctx);
+  try{
+    if(response.status===401)await recordLoginFailure(env,{ip,email});
+    else if(response.ok)await clearLoginFailures(env,{ip,email});
+  }catch(e){console.warn('login_rate_limit_write_failed',e?.message||String(e))}
+  return response;
+}
 
 async function enforceExtendedStatePermissions(request,env){
   const user=await userFromSession(request,env);if(!user)return null;
