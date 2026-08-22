@@ -139,14 +139,88 @@
     panel.innerHTML=`<h2 style="margin-bottom:12px">Daten & Sicherung</h2><p class="muted">RAUMWERK arbeitet hier mit dem gemeinsamen zentralen Datenstand. Demo-Daten, lokaler Import und Komplett-Reset sind im Onlinebetrieb bewusst deaktiviert.</p><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button class="btn" onclick="exportData()">Vollständige Datensicherung</button></div><div class="notice" style="margin-top:16px">Damit kann kein Benutzer versehentlich die gemeinsamen Produktivdaten durch Test- oder lokale Daten ersetzen.</div>`;
   }
 
+  // Benutzerverwaltung ohne Browser-Prompts + sichtbares Änderungsprotokoll.
+  function setupAdminTools(){
+    if(!document.getElementById('cloudAdminToolsStyle')){
+      const style=document.createElement('style');style.id='cloudAdminToolsStyle';style.textContent=`.cloud-admin-row{display:grid;grid-template-columns:minmax(180px,1fr) 170px 110px;gap:10px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}.cloud-admin-row:first-child{border-top:0}.cloud-admin-row select{width:100%;padding:8px;border:1px solid var(--line);border-radius:9px;background:#fff}.audit-row{display:grid;grid-template-columns:150px minmax(180px,1fr) minmax(180px,1.3fr);gap:12px;padding:11px 0;border-top:1px solid var(--line);font-size:13px}.audit-row:first-child{border-top:0}.audit-time{color:#7b8698}.audit-action{font-weight:800}@media(max-width:760px){.cloud-admin-row,.audit-row{grid-template-columns:1fr}.cloud-admin-row{gap:7px}.audit-row{gap:4px}}`;document.head.appendChild(style);
+    }
+    if(!document.getElementById('cloudUserModal'))document.body.insertAdjacentHTML('beforeend',`<div class="modal" id="cloudUserModal"><div class="modal-box"><div class="modal-head"><h2>Benutzer anlegen</h2><button class="icon-btn" onclick="closeModal('cloudUserModal')">✕</button></div><div class="form-error" id="cloudUserModalError"></div><div class="field"><label>Name *</label><input id="cloudNewUserName"></div><div class="field"><label>E-Mail *</label><input id="cloudNewUserEmail" type="email"></div><div class="field"><label>Startpasswort *</label><input id="cloudNewUserPassword" type="password" minlength="10" placeholder="Mindestens 10 Zeichen"></div><div class="field"><label>Rolle</label><select id="cloudNewUserRole"><option value="staff">Mitarbeiter</option><option value="manager">Leitung</option><option value="cleaning">Reinigung</option><option value="viewer">Nur lesen</option><option value="admin">Administrator</option></select></div><div class="modal-actions"><button class="btn" onclick="closeModal('cloudUserModal')">Abbrechen</button><button class="btn primary" onclick="saveCloudUserModal()">Benutzer anlegen</button></div></div></div>`);
+    const grid=document.querySelector('#page-settings .settings-grid');
+    if(cloud.mode==='online'&&['admin','manager'].includes(cloud.user?.role)&&grid&&!document.getElementById('cloudAuditPanel')){
+      grid.insertAdjacentHTML('beforeend',`<div class="panel" id="cloudAuditPanel"><div class="panel-head"><div><h2>Änderungsprotokoll</h2><div class="muted">Die letzten 100 sicherheitsrelevanten Vorgänge.</div></div><button class="btn small" onclick="loadAuditLog()">Aktualisieren</button></div><div id="cloudAuditList"><div class="empty">Protokoll wird geladen …</div></div></div>`);
+    }
+  }
+
+  openCloudUserDialog=function(){
+    if(cloud.user?.role!=='admin')return alert('Nur Administratoren dürfen Benutzer anlegen.');
+    setupAdminTools();
+    ['cloudNewUserName','cloudNewUserEmail','cloudNewUserPassword'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('cloudNewUserRole').value='staff';
+    hideFormError('cloudUserModalError');showModal('cloudUserModal');
+  };
+
+  window.saveCloudUserModal=async function(){
+    hideFormError('cloudUserModalError');
+    const payload={name:document.getElementById('cloudNewUserName').value.trim(),email:document.getElementById('cloudNewUserEmail').value.trim(),password:document.getElementById('cloudNewUserPassword').value,role:document.getElementById('cloudNewUserRole').value};
+    if(!payload.name||!payload.email||payload.password.length<10)return showFormError('cloudUserModalError','Bitte Name, E-Mail und ein Passwort mit mindestens 10 Zeichen angeben.');
+    const res=await fetch('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const data=await res.json();
+    if(!res.ok)return showFormError('cloudUserModalError',data.error||'Benutzer konnte nicht angelegt werden.');
+    closeModal('cloudUserModal');toast('Benutzer angelegt');await loadCloudUsers();await loadAuditLog();
+  };
+
+  loadCloudUsers=async function(){
+    const res=await fetch('/api/users');if(!res.ok)return;const data=await res.json();const wrap=document.getElementById('cloudUserList');if(!wrap)return;
+    const isAdmin=cloud.user?.role==='admin';
+    wrap.innerHTML=(data.users||[]).map(u=>{
+      const self=u.id===cloud.user?.id;
+      const roleOptions=['admin','manager','staff','cleaning','viewer'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${esc(roleLabel[r]||r)}</option>`).join('');
+      return `<div class="cloud-admin-row"><div><b>${esc(u.name)}</b><div class="muted">${esc(u.email)}${self?' · Du':''}</div></div><div>${isAdmin?`<select ${self?'disabled':''} onchange="changeCloudUserRole('${esc(u.id)}',this.value)">${roleOptions}</select>`:`<span class="badge">${esc(roleLabel[u.role]||u.role)}</span>`}</div><div>${isAdmin?`<button class="btn small ${u.active?'danger':''}" ${self?'disabled':''} onclick="toggleCloudUserActive('${esc(u.id)}',${u.active?'false':'true'})">${u.active?'Deaktivieren':'Aktivieren'}</button>`:`<span class="badge ${u.active?'green':'red'}">${u.active?'Aktiv':'Inaktiv'}</span>`}</div></div>`;
+    }).join('')||'<div class="empty">Keine Benutzer vorhanden.</div>';
+  };
+
+  window.changeCloudUserRole=async function(id,role){
+    const res=await fetch('/api/users/'+encodeURIComponent(id),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({role})});const data=await res.json();
+    if(!res.ok){alert(data.error||'Rolle konnte nicht geändert werden.');return loadCloudUsers()}
+    toast('Rolle geändert');await loadCloudUsers();await loadAuditLog();
+  };
+  window.toggleCloudUserActive=async function(id,active){
+    const res=await fetch('/api/users/'+encodeURIComponent(id),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({active})});const data=await res.json();
+    if(!res.ok){alert(data.error||'Benutzerstatus konnte nicht geändert werden.');return loadCloudUsers()}
+    toast(active?'Benutzer aktiviert':'Benutzer deaktiviert');await loadCloudUsers();await loadAuditLog();
+  };
+
+  const auditActionLabel={login_success:'Anmeldung',state_update:'Daten geändert',user_created:'Benutzer angelegt',user_updated:'Benutzer geändert',public_booking_direct:'Direkte Online-Buchung',public_booking_request:'Online-Buchungsanfrage'};
+  const auditFieldLabel={rooms:'Räume & Zimmer',bookings:'Buchungen',guests:'Gäste & Kunden',tasks:'Aufgaben',settings:'Einstellungen',cleaningPlans:'Reinigung',shifts:'Einsatzplanung',blocks:'Sperrzeiten',contracts:'Verträge',invoices:'Rechnungen',bookingRequests:'Online-Anfragen',billing:'Rechnungsdaten'};
+  window.loadAuditLog=async function(){
+    setupAdminTools();const wrap=document.getElementById('cloudAuditList');if(!wrap||!['admin','manager'].includes(cloud.user?.role))return;
+    const res=await fetch('/api/audit');const data=await res.json();if(!res.ok){wrap.innerHTML=`<div class="empty">${esc(data.error||'Protokoll konnte nicht geladen werden.')}</div>`;return}
+    wrap.innerHTML=(data.entries||[]).map(entry=>{
+      const date=new Date(entry.created_at);const time=Number.isNaN(date.getTime())?entry.created_at:new Intl.DateTimeFormat('de-DE',{dateStyle:'short',timeStyle:'short'}).format(date);
+      const fields=Array.isArray(entry.details?.fields)?entry.details.fields.map(f=>auditFieldLabel[f]||f).join(', '):'';
+      const detail=fields||((entry.action==='public_booking_direct'||entry.action==='public_booking_request')&&entry.details?.from?`${fmtDate(entry.details.from)} – ${fmtDate(entry.details.to)}`:'');
+      return `<div class="audit-row"><div class="audit-time">${esc(time)}</div><div><div class="audit-action">${esc(auditActionLabel[entry.action]||entry.action)}</div><div class="muted">${esc(entry.user_name||'Öffentliche Buchungsseite')}</div></div><div class="muted">${esc(detail||'–')}</div></div>`;
+    }).join('')||'<div class="empty">Noch keine protokollierten Vorgänge.</div>';
+  };
+
   const safetyRenderPage=renderPage;
-  renderPage=function(page){safetyRenderPage(page);if(page==='settings')applyProductionSafetyUi()};
+  renderPage=function(page){
+    safetyRenderPage(page);
+    if(page==='settings'){
+      applyProductionSafetyUi();setupAdminTools();
+      if(cloud.mode==='online'&&['admin','manager'].includes(cloud.user?.role)){loadCloudUsers();loadAuditLog()}
+    }
+  };
   const safetyLoadCloudState=loadCloudState;
-  loadCloudState=async function(){const result=await safetyLoadCloudState();applyProductionSafetyUi();return result};
+  loadCloudState=async function(){
+    const result=await safetyLoadCloudState();applyProductionSafetyUi();setupAdminTools();
+    if(cloud.mode==='online'&&['admin','manager'].includes(cloud.user?.role))loadAuditLog();
+    return result;
+  };
 
   setupAvailabilityUi();
   setupOnlineUi();
   renderAvailability();
   renderOnlineRequirementConfig();
   applyProductionSafetyUi();
+  setupAdminTools();
 })();
