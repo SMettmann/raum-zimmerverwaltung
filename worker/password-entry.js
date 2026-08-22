@@ -1,7 +1,7 @@
 import app from './email-entry.js';
 
 const enc=new TextEncoder();
-const PBKDF2_ITERATIONS=210000;
+const PBKDF2_ITERATIONS=100000;
 
 export default {
   async fetch(request,env,ctx){
