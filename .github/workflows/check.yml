@@ -33,10 +33,13 @@ jobs:
           node --check tests/public-rate-limit-smoke.mjs
           node --check tests/simple-blocking-smoke.cjs
           node --check tests/time-booking-smoke.mjs
+          node --check tests/booking-email-smoke.mjs
           node --check worker/index.js
           node --check worker/entry.js
           node --check worker/time-entry.js
+          node --check worker/email-entry.js
           node --check worker/time-booking.mjs
+          node --check worker/booking-email.mjs
           node --check worker/state-permissions.mjs
           node --check worker/public-rate-limit.mjs
       - name: Cleaning V2 smoke test
@@ -55,6 +58,8 @@ jobs:
         run: node tests/simple-blocking-smoke.cjs
       - name: Timed seminar booking smoke test
         run: node tests/time-booking-smoke.mjs
+      - name: Automatic booking email smoke test
+        run: node tests/booking-email-smoke.mjs
       - name: Install Wrangler
         run: npm install
       - name: Wrangler dry run
