@@ -14,6 +14,7 @@ export default {
       let next=html;
       if(!next.includes('password-management.js'))next=next.replace('</body>','<script src="password-management.js"></script></body>');
       if(!next.includes('cleaning-history-expand.js'))next=next.replace('</body>','<script src="cleaning-history-expand.js"></script></body>');
+      if(!next.includes('live-test-fixes.js'))next=next.replace('</body>','<script src="live-test-fixes.js"></script></body>');
       if(next===html)return new Response(html,{status:response.status,headers:response.headers});
       const headers=new Headers(response.headers);headers.delete('Content-Length');
       return new Response(next,{status:response.status,statusText:response.statusText,headers});
