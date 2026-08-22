@@ -17,6 +17,8 @@ for(const text of [
   'liveRoundTwoRoleStyle',
   'html[data-role="cleaning"] .top-actions{display:flex!important}',
   'html[data-role="cleaning"] .top-actions>button{display:none!important}',
+  'html[data-role="staff"] #page-invoices .toolbar .btn.primary',
+  'html[data-role="staff"] #page-invoices .req-actions button:not(.view-only)',
   'billingSettingsPanel',
   'finishCleaningJob=function',
   'job.completedBy=who.name',
