@@ -3,19 +3,25 @@
   const NEW='RAUMSUITE';
   const bookingPage=/\/booking\.html$/i.test(location.pathname);
 
-  function swap(value){return typeof value==='string'?value.replaceAll(OLD,NEW):value}
+  function swap(value){
+    if(typeof value!=='string')return value;
+    return value.replaceAll(OLD,NEW).replace(/\bOption\b/g,'Vorgemerkt');
+  }
 
   function replaceVisibleText(root){
     if(!root)return;
     if(root.nodeType===Node.TEXT_NODE){
-      if(root.nodeValue&&root.nodeValue.includes(OLD))root.nodeValue=swap(root.nodeValue);
+      if(root.nodeValue){
+        const next=swap(root.nodeValue);
+        if(next!==root.nodeValue)root.nodeValue=next;
+      }
       return;
     }
     if(root.nodeType!==Node.ELEMENT_NODE&&root.nodeType!==Node.DOCUMENT_FRAGMENT_NODE)return;
     const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode(node){
       const p=node.parentElement;
       if(!p||['SCRIPT','STYLE','NOSCRIPT'].includes(p.tagName))return NodeFilter.FILTER_REJECT;
-      return node.nodeValue?.includes(OLD)?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_REJECT;
+      return swap(node.nodeValue)!==node.nodeValue?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_REJECT;
     }});
     const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
     nodes.forEach(node=>{node.nodeValue=swap(node.nodeValue)});
