@@ -1,6 +1,7 @@
 (function(){
   const OLD='RAUMWERK';
   const NEW='RAUMSUITE';
+  const bookingPage=/\/booking\.html$/i.test(location.pathname);
 
   function swap(value){return typeof value==='string'?value.replaceAll(OLD,NEW):value}
 
@@ -49,7 +50,26 @@
     };
   }
 
-  if(!/\/booking\.html$/i.test(location.pathname)){
+  if(!bookingPage){
+    const presentationActive=()=>Boolean(sessionStorage.getItem('raumsuite_presentation_backup'));
+    document.addEventListener('click',event=>{
+      const link=event.target.closest?.('a[href*="booking.html"]');
+      if(!link||!presentationActive())return;
+      event.preventDefault();
+      const url=new URL(link.getAttribute('href'),location.href);
+      url.searchParams.set('demo','1');
+      window.open(url.href,link.target||'_self');
+    },true);
+
+    if(typeof window.copyBookingLink==='function'){
+      const originalCopyBookingLink=window.copyBookingLink;
+      window.copyBookingLink=function(){
+        if(!presentationActive())return originalCopyBookingLink();
+        const url=new URL('booking.html',location.href);url.searchParams.set('demo','1');
+        navigator.clipboard?.writeText(url.href);if(typeof toast==='function')toast('Präsentations-Buchungslink kopiert');
+      };
+    }
+
     const featureScript=document.createElement('script');
     featureScript.src='location-demo.js';
     featureScript.defer=true;
