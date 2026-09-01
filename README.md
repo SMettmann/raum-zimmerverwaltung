@@ -1,6 +1,6 @@
-# RAUMWERK – Raum- & Zimmerverwaltung
+# RAUMSUITE – Raum- & Zimmerverwaltung
 
-RAUMWERK ist eine bewusst sehr einfach bedienbare Raum- und Zimmerverwaltung: öffnen, verstehen, benutzen – ohne Schulung.
+RAUMSUITE ist eine bewusst sehr einfach bedienbare Raum- und Zimmerverwaltung: öffnen, verstehen, benutzen – ohne Schulung.
 
 ## Aktuell nutzbar
 
@@ -55,17 +55,21 @@ Danach deployen:
 npm run deploy
 ```
 
-Beim ersten Öffnen der bereitgestellten RAUMWERK-Adresse erscheint automatisch die Ersteinrichtung. Der erste Zugang wird Administrator; vorhandene lokale Daten können direkt in den zentralen Datenstand übernommen werden.
+Beim ersten Öffnen der bereitgestellten RAUMSUITE-Adresse erscheint automatisch die Ersteinrichtung. Der erste Zugang wird Administrator; vorhandene lokale Daten können direkt in den zentralen Datenstand übernommen werden.
+
+> Hinweis: Bestehende technische Bezeichner wie `raumwerk-db` bleiben vorerst aus Kompatibilitätsgründen bestehen. Sie sind für Nutzer nicht sichtbar und haben keinen Einfluss auf die Produktmarke RAUMSUITE.
 
 ## Produktionsdeployment über GitHub Actions
 
-Der Workflow `Deploy RAUMWERK to Cloudflare` kann manuell gestartet werden. Dafür werden in den GitHub Actions Secrets drei Werte benötigt:
+Der bestehende Cloudflare-Workflow kann manuell gestartet werden. Dafür werden in den GitHub Actions Secrets drei Werte benötigt:
 
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 - `RAUMWERK_D1_DATABASE_ID`
 
 Der Workflow erzeugt daraus nur für den Lauf eine Deployment-Konfiguration, spielt `schema.sql` sicher mit `CREATE TABLE IF NOT EXISTS` ein und deployt danach Worker und Frontend. Die D1-Datenbank-ID muss deshalb nicht fest ins Repository geschrieben werden.
+
+Auch der bestehende Secret-Name `RAUMWERK_D1_DATABASE_ID` wird vorerst als technischer Legacy-Bezeichner beibehalten, damit das Deployment nicht durch die Umbenennung beschädigt wird.
 
 ## XRechnung
 
