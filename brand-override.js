@@ -48,4 +48,9 @@
       return originalDownloadFile(brandedName,content,type);
     };
   }
+
+  const featureScript=document.createElement('script');
+  featureScript.src='location-demo.js';
+  featureScript.defer=true;
+  document.head.appendChild(featureScript);
 })();
