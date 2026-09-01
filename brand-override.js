@@ -49,12 +49,10 @@
     };
   }
 
-  const featureScript=document.createElement('script');
-  featureScript.src='location-demo.js';
-  featureScript.onload=()=>{
-    const invoiceScript=document.createElement('script');
-    invoiceScript.src='presentation-invoices.js';
-    document.head.appendChild(invoiceScript);
-  };
-  document.head.appendChild(featureScript);
+  if(!/\/booking\.html$/i.test(location.pathname)){
+    const featureScript=document.createElement('script');
+    featureScript.src='location-demo.js';
+    featureScript.defer=true;
+    document.head.appendChild(featureScript);
+  }
 })();
