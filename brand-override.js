@@ -79,6 +79,12 @@
     const featureScript=document.createElement('script');
     featureScript.src='location-demo.js';
     featureScript.defer=true;
+    featureScript.addEventListener('load',()=>{
+      const invoiceScript=document.createElement('script');
+      invoiceScript.src='presentation-invoices.js';
+      invoiceScript.defer=true;
+      document.head.appendChild(invoiceScript);
+    });
     document.head.appendChild(featureScript);
   }
 })();
