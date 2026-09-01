@@ -51,6 +51,10 @@
 
   const featureScript=document.createElement('script');
   featureScript.src='location-demo.js';
-  featureScript.defer=true;
+  featureScript.onload=()=>{
+    const invoiceScript=document.createElement('script');
+    invoiceScript.src='presentation-invoices.js';
+    document.head.appendChild(invoiceScript);
+  };
   document.head.appendChild(featureScript);
 })();
