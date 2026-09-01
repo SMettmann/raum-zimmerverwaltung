@@ -77,7 +77,7 @@ export async function sendBookingConfirmationOnce(env,{orgId,organizationName,st
   const mail=buildBookingConfirmation({state,booking,organizationName});
   const fromAddress=String(env.TRANSACTIONAL_FROM_EMAIL).trim();
   if(!validEmail(fromAddress))return {status:'invalid_sender'};
-  const displayName=safeDisplayName(organizationName||state?.settings?.org||'RAUMWERK');
+  const displayName=safeDisplayName(organizationName||state?.settings?.org||'RAUMSUITE');
   const payload={from:`${displayName} <${fromAddress}>`,to:[recipient],subject:mail.subject,html:mail.html,text:mail.text};
   if(mail.replyTo)payload.reply_to=mail.replyTo;
 
@@ -105,6 +105,6 @@ async function writeEmailLog(env,{eventKey,orgId,bookingId,recipient,status,prov
 function validEmail(value){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value||''))}
 function validTime(value){return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value||''))}
 function formatDate(value){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||''));return m?`${m[3]}.${m[2]}.${m[1]}`:String(value||'–')}
-function safeDisplayName(value){return String(value||'RAUMWERK').replace(/[\r\n<>]/g,' ').replace(/\s+/g,' ').trim().slice(0,100)||'RAUMWERK'}
+function safeDisplayName(value){return String(value||'RAUMSUITE').replace(/[\r\n<>]/g,' ').replace(/\s+/g,' ').trim().slice(0,100)||'RAUMSUITE'}
 function htmlEsc(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 async function safeResponseJson(response){try{return await response.json()}catch{return {}}}
