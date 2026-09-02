@@ -70,6 +70,10 @@
     return script;
   }
 
+  if(bookingPage){
+    loadScript('presentation-request-sync.js?v=20260902-6');
+  }
+
   if(!bookingPage){
     const presentationActive=()=>Boolean(sessionStorage.getItem('raumsuite_presentation_backup'));
     document.addEventListener('click',event=>{
@@ -90,18 +94,20 @@
       };
     }
 
-    loadScript('location-demo.js?v=20260902-5',()=>{
-      loadScript('presentation-invoices.js?v=20260902-5');
+    loadScript('location-demo.js?v=20260902-6',()=>{
+      loadScript('presentation-invoices.js?v=20260902-6');
     });
 
     window.addEventListener('load',()=>{
       const afterCatering=()=>{
-        loadScript('location-filter-final.js?v=20260902-5',()=>{
-          loadScript('catering-visual-final.js?v=20260902-5');
+        loadScript('location-filter-final.js?v=20260902-6',()=>{
+          loadScript('presentation-request-sync.js?v=20260902-6',()=>{
+            loadScript('catering-visual-final.js?v=20260902-6');
+          });
         });
       };
       if(window.__raumsuiteCateringLoaded)afterCatering();
-      else loadScript('catering-booking.js?v=20260902-5',afterCatering);
+      else loadScript('catering-booking.js?v=20260902-6',afterCatering);
     },{once:true});
   }
 })();
