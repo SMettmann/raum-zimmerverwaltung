@@ -13,8 +13,13 @@ export default {
   }
 };
 
-async function loadOrgState(env){
-  const row=await env.DB.prepare(`SELECT o.id AS org_id,o.name AS org_name,s.version,s.data FROM organizations o JOIN app_state s ON s.org_id=o.id ORDER BY o.created_at LIMIT 1`).first();
+async function loadOrgState(env,orgId=''){
+  let row;
+  if(orgId){
+    row=await env.DB.prepare(`SELECT o.id AS org_id,o.name AS org_name,s.version,s.data FROM organizations o JOIN app_state s ON s.org_id=o.id WHERE o.id=? LIMIT 1`).bind(orgId).first();
+  }else{
+    row=await env.DB.prepare(`SELECT o.id AS org_id,o.name AS org_name,s.version,s.data FROM organizations o JOIN app_state s ON s.org_id=o.id ORDER BY s.updated_at DESC,o.created_at DESC LIMIT 1`).first();
+  }
   if(!row)return null;
   let state;try{state=JSON.parse(row.data)}catch{return null}
   return {...row,state};
@@ -35,7 +40,8 @@ function addDirectBooking(state,room,data){
 
 async function handlePublicTimed(request,env,url){
   if(request.method!=='GET'&&request.method!=='HEAD'&&!sameOrigin(request,url))return json({error:'Ungültiger Ursprung.'},403);
-  const data=await loadOrgState(env);if(!data)return json({error:'RAUMSUITE ist noch nicht eingerichtet.'},503);
+  const orgId=text(url.searchParams.get('org'),100);
+  const data=await loadOrgState(env,orgId);if(!data)return json({error:'RAUMSUITE ist für diesen Buchungslink nicht eingerichtet.'},503);
 
   if(url.pathname==='/api/public/config'&&request.method==='GET'){
     return json({organization:data.org_name,mode:bookingMode(data.state),rooms:(data.state.rooms||[]).map(r=>({id:r.id,name:r.name,type:r.type,capacity:r.capacity||1,note:r.note||'',location:r.location||'',timed:isTimedRoomType(r.type)}))});
@@ -62,7 +68,7 @@ async function handlePublicTimed(request,env,url){
     if(!roomAvailable(data.state,room,range))return json({error:'Der gewünschte Zeitraum ist inzwischen nicht mehr verfügbar.'},409);
 
     for(let attempt=0;attempt<3;attempt++){
-      const fresh=attempt?await loadOrgState(env):data;if(!fresh)return json({error:'Daten nicht verfügbar.'},503);
+      const fresh=attempt?await loadOrgState(env,orgId):data;if(!fresh)return json({error:'Daten nicht verfügbar.'},503);
       const freshRoom=(fresh.state.rooms||[]).find(r=>r.id===roomId);if(!freshRoom)return json({error:'Raum nicht gefunden.'},404);
       if(!roomAvailable(fresh.state,freshRoom,range))return json({error:'Der gewünschte Zeitraum ist inzwischen nicht mehr verfügbar.'},409);
       const payload={name,email,phone,roomId,from,to,fromTime:isTimedRoomType(freshRoom.type)?fromTime:'',toTime:isTimedRoomType(freshRoom.type)?toTime:'',purpose,participants,note};
