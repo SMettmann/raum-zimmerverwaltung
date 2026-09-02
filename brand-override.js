@@ -76,15 +76,18 @@
       };
     }
 
-    const featureScript=document.createElement('script');
-    featureScript.src='location-demo.js';
-    featureScript.defer=true;
-    featureScript.addEventListener('load',()=>{
-      const invoiceScript=document.createElement('script');
-      invoiceScript.src='presentation-invoices.js';
-      invoiceScript.defer=true;
-      document.head.appendChild(invoiceScript);
+    function loadScript(src,onload){
+      if([...document.scripts].some(s=>s.src&&s.src.endsWith('/'+src))){onload?.();return}
+      const script=document.createElement('script');
+      script.src=src;
+      script.addEventListener('load',()=>onload?.(),{once:true});
+      document.head.appendChild(script);
+    }
+
+    loadScript('catering-booking.js',()=>{
+      loadScript('location-demo.js',()=>{
+        loadScript('presentation-invoices.js');
+      });
     });
-    document.head.appendChild(featureScript);
   }
 })();
