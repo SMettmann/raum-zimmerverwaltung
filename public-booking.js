@@ -1,47 +1,75 @@
 let publicRooms=[];let selectedRoom='';let currentAvailable=[];let bookingMode='request';
 const WORKER_ORIGIN='https://raumsuite.mettmannsven8.workers.dev';
 const staticGithubHost=location.hostname.endsWith('github.io');
-const demoMode=new URLSearchParams(location.search).get('demo')==='1';
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
-const plusDay=n=>{const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 const timedType=type=>['Seminarraum','Besprechungsraum','Veranstaltungsraum'].includes(String(type||''));
 const roomIsTimed=room=>room?.timed===true||timedType(room?.type);
-if(staticGithubHost){location.replace(`${WORKER_ORIGIN}/booking.html${location.search}${location.hash}`)}else{document.getElementById('from').value=today();document.getElementById('to').value=today();boot()}
-
-function makeDemoRooms(){
-  const rooms=[];
-  for(let i=1;i<=32;i++){
-    const cap=i<=12?1:2,num=String(i).padStart(3,'0');
-    rooms.push({id:`nz${num}`,name:`Gästezimmer ${num}`,type:cap===1?'Einzelzimmer':'Doppelzimmer',capacity:cap,note:`${cap} ${cap===1?'Bett':'Betten'} · Dusche/WC`,location:'Standort Nord',timed:false});
-  }
-  [['Forum',52],['Garten',36],['Atrium',24],['Bibliothek',18],['Studio',12]].forEach(([name,capacity],i)=>rooms.push({id:`nt${i+1}`,name:`Tagungsraum ${name}`,type:'Seminarraum',capacity,note:i===0?'Beamer · WLAN · flexible Bestuhlung':i===1?'Display · Flipchart · WLAN':i===2?'Beamer · Tonanlage':i===3?'Whiteboard · Gruppenarbeit':'Flexible Bestuhlung · WLAN',location:'Standort Nord',timed:true}));
-  for(let i=1;i<=16;i++){
-    const cap=i<=4?3:4,num=String(i).padStart(3,'0');
-    rooms.push({id:`sz${num}`,name:`Gästezimmer ${num}`,type:'Mehrbettzimmer',capacity:cap,note:`${cap} Betten · Dusche/WC`,location:'Standort Süd',timed:false});
-  }
-  [['Panorama',60],['Atelier',42],['Campus',30],['Werkstatt',20],['Lounge',14]].forEach(([name,capacity],i)=>rooms.push({id:`st${i+1}`,name:`Tagungsraum ${name}`,type:'Seminarraum',capacity,note:i===0?'Beamer · Tonanlage · WLAN':i===1?'Display · Flipchart · WLAN':i===2?'Beamer · Gruppenarbeit':i===3?'Whiteboard · flexible Bestuhlung':'WLAN · flexible Bestuhlung',location:'Standort Süd',timed:true}));
-  return rooms;
+if(staticGithubHost){location.replace(`${WORKER_ORIGIN}/booking.html${location.search}${location.hash}`)}else{
+  document.getElementById('from').value=today();document.getElementById('to').value=today();
+  document.getElementById('participants')?.addEventListener('input',()=>renderAvailableRooms());
+  boot();
 }
-function demoBookings(){return [{roomId:'nt1',from:plusDay(0),to:plusDay(0)},{roomId:'nz001',from:plusDay(0),to:plusDay(2)},{roomId:'st1',from:plusDay(1),to:plusDay(2)},{roomId:'sz001',from:plusDay(1),to:plusDay(2)},{roomId:'sz002',from:plusDay(1),to:plusDay(2)}]}
-function overlaps(aFrom,aTo,bFrom,bTo){return aFrom<=bTo&&aTo>=bFrom}
-function demoAvailable(from,to){const busy=demoBookings();return publicRooms.filter(r=>!busy.some(b=>b.roomId===r.id&&overlaps(from,to,b.from,b.to))).map(r=>r.id)}
 
-async function responseJson(r){const type=r.headers.get('Content-Type')||'',text=await r.text();if(type.includes('application/json')){try{return text?JSON.parse(text):{}}catch{}}else{try{return text?JSON.parse(text):{}}catch{}}throw new Error('Die Buchungsseite wurde über eine Adresse ohne RAUMSUITE-Backend geöffnet. Bitte die Buchungsseite erneut aus RAUMSUITE öffnen.')}
+async function responseJson(r){const text=await r.text();try{return text?JSON.parse(text):{}}catch{throw new Error('Die Buchungsseite konnte keine gültige Antwort vom RAUMSUITE-Backend laden.')}}
 async function boot(){
-  if(demoMode){
-    document.getElementById('orgName').textContent='Tagungs- & Gästehaus Beispiel · Präsentationsmodus';
-    document.getElementById('heroText').textContent='Fiktive Beispieldaten für zwei Standorte. Zeitraum auswählen, freien Raum oder ein Zimmer wählen und eine Buchungsanfrage simulieren.';
-    publicRooms=makeDemoRooms();bookingMode='request';applyBookingMode();renderRooms([]);return;
-  }
-  try{const r=await fetch('/api/public/config',{headers:{Accept:'application/json'}});const d=await responseJson(r);if(!r.ok)throw new Error(d.error||'Online-Buchung ist noch nicht aktiv.');document.getElementById('orgName').textContent=d.organization||'Online-Buchung';publicRooms=d.rooms||[];bookingMode=d.mode==='direct'?'direct':'request';applyBookingMode();renderRooms([])}catch(e){showError(e.message);document.getElementById('availabilityNote').textContent='Die Online-Buchung konnte nicht geladen werden.'}
+  try{
+    const r=await fetch('/api/public/config',{headers:{Accept:'application/json'}}),d=await responseJson(r);
+    if(!r.ok)throw new Error(d.error||'Online-Buchung ist noch nicht aktiv.');
+    document.getElementById('orgName').textContent=d.organization||'Online-Buchung';
+    publicRooms=Array.isArray(d.rooms)?d.rooms:[];bookingMode=d.mode==='direct'?'direct':'request';applyBookingMode();renderAvailableRooms();
+  }catch(e){showError(e.message);document.getElementById('availabilityNote').textContent='Die Online-Buchung konnte nicht geladen werden.';}
 }
-function applyBookingMode(){const direct=bookingMode==='direct';const title=document.getElementById('heroTitle'),text=document.getElementById('heroText'),button=document.getElementById('submitBooking');if(title)title.textContent=direct?'Raum oder Zimmer direkt buchen':'Raum oder Zimmer anfragen';if(text&&!demoMode)text.textContent=direct?'Zeitraum auswählen, freien Raum wählen und direkt verbindlich buchen. Die Verfügbarkeit wird beim Absenden erneut geprüft.':'Zeitraum auswählen, freien Raum wählen und Anfrage senden. Die Einrichtung bestätigt anschließend die Buchung.';if(button)button.textContent=demoMode?'Buchungsanfrage simulieren':direct?'Jetzt verbindlich buchen':'Buchungsanfrage senden'}
+function applyBookingMode(){
+  const direct=bookingMode==='direct',title=document.getElementById('heroTitle'),text=document.getElementById('heroText'),button=document.getElementById('submitBooking');
+  if(title)title.textContent=direct?'Raum oder Zimmer direkt buchen':'Raum oder Zimmer anfragen';
+  if(text)text.textContent=direct?'Zeitraum auswählen. Anschließend werden ausschließlich aktuell freie Räume und Zimmer angezeigt.':'Zeitraum auswählen. Anschließend werden ausschließlich aktuell freie Räume und Zimmer angezeigt und können angefragt werden.';
+  if(button)button.textContent=direct?'Jetzt verbindlich buchen':'Buchungsanfrage senden';
+}
 function validPeriod(from,to,fromTime,toTime){if(!from||!to||to<from)return false;if(from===to&&fromTime&&toTime&&fromTime>=toTime)return false;return true}
-async function checkAvailability(){hideMessages();const from=v('from'),to=v('to'),fromTime=v('fromTime'),toTime=v('toTime');if(!validPeriod(from,to,fromTime,toTime))return showError('Bitte einen gültigen Zeitraum und passende Uhrzeiten auswählen.');if(demoMode){selectedRoom='';currentAvailable=demoAvailable(from,to);renderRooms(currentAvailable);const n=currentAvailable.length;document.getElementById('availabilityNote').textContent=n?`${n} Raum/Räume sind verfügbar. Bitte auswählen.`:'In diesem Zeitraum ist aktuell kein Raum verfügbar.';return}try{const r=await fetch('/api/public/availability',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({from,to,fromTime,toTime})});const d=await responseJson(r);if(!r.ok)throw new Error(d.error||'Verfügbarkeit konnte nicht geprüft werden.');selectedRoom='';currentAvailable=d.rooms||[];renderRooms(currentAvailable);const n=currentAvailable.length;document.getElementById('availabilityNote').textContent=n?`${n} Raum/Räume sind verfügbar. Bitte auswählen.`:'In diesem Zeitraum ist aktuell kein Raum verfügbar.'}catch(e){showError(e.message)}}
-function renderRooms(available){const checked=new Set(available);document.getElementById('rooms').innerHTML=publicRooms.map(r=>`<div class="room ${available.length&&!checked.has(r.id)?'off':''} ${selectedRoom===r.id?'active':''}" onclick="selectRoom('${safe(r.id)}')"><h3>${safe(r.name)}</h3>${r.location?`<div class="muted"><b>${safe(r.location)}</b></div>`:''}<div class="muted">${safe(r.type)} · bis ${Number(r.capacity)||1} Pers.</div><div class="muted" style="margin-top:4px">${roomIsTimed(r)?'Buchbar mit Uhrzeit':'Tagesweise Buchung'}</div>${r.note?`<div class="muted" style="margin-top:6px">${safe(r.note)}</div>`:''}</div>`).join('')}
-function selectRoom(id){if(currentAvailable.length&&!currentAvailable.includes(id))return;selectedRoom=id;renderRooms(currentAvailable);const room=publicRooms.find(r=>r.id===id);document.getElementById('availabilityNote').textContent=roomIsTimed(room)?`Ausgewählt: ${room?.name||''}${room?.location?' · '+room.location:''} · ${v('fromTime')}–${v('toTime')} Uhr`:`Ausgewählt: ${room?.name||''}${room?.location?' · '+room.location:''} · tagesweise`}
-async function sendRequest(){hideMessages();const payload={name:v('name'),email:v('email'),phone:v('phone'),purpose:v('purpose'),participants:Number(v('participants'))||1,note:v('note'),website:v('website'),roomId:selectedRoom,from:v('from'),to:v('to'),fromTime:v('fromTime'),toTime:v('toTime')};if(!payload.roomId)return showError('Bitte zuerst einen verfügbaren Raum auswählen.');if(!payload.name||!payload.email)return showError('Bitte Name und E-Mail ausfüllen.');const room=publicRooms.find(r=>r.id===payload.roomId);if(roomIsTimed(room)&&!validPeriod(payload.from,payload.to,payload.fromTime,payload.toTime))return showError('Bitte gültige Uhrzeiten für diesen Raum angeben.');if(room&&payload.participants>Number(room.capacity||1))return showError(`Dieser Raum ist für maximal ${Number(room.capacity)||1} Personen ausgelegt.`);if(demoMode){document.getElementById('success').style.display='block';document.getElementById('success').textContent='Präsentationsmodus: Die Buchungsanfrage wurde erfolgreich simuliert. Es wurden keine Daten versendet.';['name','email','phone','purpose','note'].forEach(id=>document.getElementById(id).value='');selectedRoom='';return}try{const r=await fetch('/api/public/request',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(payload)});const d=await responseJson(r);if(!r.ok)throw new Error(d.error||(bookingMode==='direct'?'Buchung konnte nicht abgeschlossen werden.':'Anfrage konnte nicht gesendet werden.'));document.getElementById('success').style.display='block';document.getElementById('success').textContent=d.message||(d.mode==='direct'?'Die Buchung wurde verbindlich bestätigt.':'Danke! Die Buchungsanfrage wurde an die Einrichtung übermittelt.');['name','email','phone','purpose','note'].forEach(id=>document.getElementById(id).value='');selectedRoom='';await checkAvailability()}catch(e){showError(e.message)}}
-function v(id){return document.getElementById(id).value.trim()}
-function showError(msg){const e=document.getElementById('error');e.textContent=msg;e.style.display='block'}
-function hideMessages(){document.getElementById('error').style.display='none';document.getElementById('success').style.display='none'}
-function safe(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+function suitableAvailable(){
+  const ids=new Set(currentAvailable),people=Math.max(1,Number(v('participants'))||1);
+  return publicRooms.filter(r=>ids.has(r.id)&&Number(r.capacity||1)>=people).sort((a,b)=>String(a.location||'').localeCompare(String(b.location||''))||String(a.name||'').localeCompare(String(b.name||'')));
+}
+function renderAvailableRooms(){
+  const wrap=document.getElementById('rooms');if(!wrap)return;
+  const list=suitableAvailable();
+  if(!currentAvailable.length){wrap.innerHTML='';return;}
+  wrap.innerHTML=list.map(r=>`<div class="room ${selectedRoom===r.id?'active':''}" onclick="selectRoom('${safe(r.id)}')"><h3>${safe(r.name)}</h3>${r.location?`<div class="muted"><b>${safe(r.location)}</b></div>`:''}<div class="muted">${safe(r.type)} · bis ${Number(r.capacity)||1} Pers.</div><div class="muted" style="margin-top:4px">${roomIsTimed(r)?'Buchbar mit Uhrzeit':'Tagesweise Buchung'}</div>${r.note?`<div class="muted" style="margin-top:6px">${safe(r.note)}</div>`:''}</div>`).join('');
+  const note=document.getElementById('availabilityNote');
+  if(note&&currentAvailable.length)note.textContent=list.length?`${list.length} passende freie Räume/Zimmer verfügbar. Bitte auswählen.`:'Für die angegebene Teilnehmerzahl ist aktuell kein passender freier Raum verfügbar.';
+}
+async function checkAvailability(){
+  hideMessages();const from=v('from'),to=v('to'),fromTime=v('fromTime'),toTime=v('toTime');
+  if(!validPeriod(from,to,fromTime,toTime))return showError('Bitte einen gültigen Zeitraum und passende Uhrzeiten auswählen.');
+  try{
+    const r=await fetch('/api/public/availability',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({from,to,fromTime,toTime})}),d=await responseJson(r);
+    if(!r.ok)throw new Error(d.error||'Verfügbarkeit konnte nicht geprüft werden.');
+    selectedRoom='';currentAvailable=Array.isArray(d.rooms)?d.rooms:[];renderAvailableRooms();
+    if(!currentAvailable.length)document.getElementById('availabilityNote').textContent='In diesem Zeitraum ist aktuell kein Raum oder Zimmer verfügbar.';
+  }catch(e){showError(e.message);}
+}
+function selectRoom(id){
+  if(!currentAvailable.includes(id))return;selectedRoom=id;renderAvailableRooms();
+  const room=publicRooms.find(r=>r.id===id);
+  document.getElementById('availabilityNote').textContent=roomIsTimed(room)?`Ausgewählt: ${room?.name||''}${room?.location?' · '+room.location:''} · ${v('fromTime')}–${v('toTime')} Uhr`:`Ausgewählt: ${room?.name||''}${room?.location?' · '+room.location:''} · tagesweise`;
+}
+async function sendRequest(){
+  hideMessages();
+  const payload={name:v('name'),email:v('email'),phone:v('phone'),purpose:v('purpose'),participants:Number(v('participants'))||1,note:v('note'),website:v('website'),roomId:selectedRoom,from:v('from'),to:v('to'),fromTime:v('fromTime'),toTime:v('toTime')};
+  if(!payload.roomId)return showError('Bitte zuerst die Verfügbarkeit prüfen und einen freien Raum oder ein Zimmer auswählen.');
+  if(!payload.name||!payload.email)return showError('Bitte Name und E-Mail ausfüllen.');
+  const room=publicRooms.find(r=>r.id===payload.roomId);
+  if(roomIsTimed(room)&&!validPeriod(payload.from,payload.to,payload.fromTime,payload.toTime))return showError('Bitte gültige Uhrzeiten für diesen Raum angeben.');
+  if(room&&payload.participants>Number(room.capacity||1))return showError(`Dieser Raum ist für maximal ${Number(room.capacity)||1} Personen ausgelegt.`);
+  try{
+    const r=await fetch('/api/public/request',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(payload)}),d=await responseJson(r);
+    if(!r.ok)throw new Error(d.error||(bookingMode==='direct'?'Buchung konnte nicht abgeschlossen werden.':'Anfrage konnte nicht gesendet werden.'));
+    document.getElementById('success').style.display='block';
+    document.getElementById('success').textContent=d.message||(d.mode==='direct'?'Die Buchung wurde verbindlich bestätigt.':'Danke! Die Buchungsanfrage wurde an die Einrichtung übermittelt.');
+    ['name','email','phone','purpose','note'].forEach(id=>document.getElementById(id).value='');selectedRoom='';await checkAvailability();
+  }catch(e){showError(e.message);}
+}
+function v(id){return document.getElementById(id)?.value?.trim?.()||'';}
+function showError(msg){const e=document.getElementById('error');e.textContent=msg;e.style.display='block';}
+function hideMessages(){document.getElementById('error').style.display='none';document.getElementById('success').style.display='none';}
+function safe(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
