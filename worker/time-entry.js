@@ -72,15 +72,16 @@ async function handlePublicTimed(request,env,url){
       const freshRoom=(fresh.state.rooms||[]).find(r=>r.id===roomId);if(!freshRoom)return json({error:'Raum nicht gefunden.'},404);
       if(!roomAvailable(fresh.state,freshRoom,range))return json({error:'Der gewünschte Zeitraum ist inzwischen nicht mehr verfügbar.'},409);
       const payload={name,email,phone,roomId,from,to,fromTime:isTimedRoomType(freshRoom.type)?fromTime:'',toTime:isTimedRoomType(freshRoom.type)?toTime:'',purpose,participants,note};
+      const roomSnapshot={roomName:String(freshRoom.name||''),roomType:String(freshRoom.type||''),roomLocation:String(freshRoom.location||'')};
       const mode=bookingMode(fresh.state);
       if(mode==='direct')addDirectBooking(fresh.state,freshRoom,payload);
       else {
         fresh.state.bookingRequests=Array.isArray(fresh.state.bookingRequests)?fresh.state.bookingRequests:[];
-        fresh.state.bookingRequests.push({id:crypto.randomUUID(),...payload,status:'new',createdAt:new Date().toISOString(),source:'public'});
+        fresh.state.bookingRequests.push({id:crypto.randomUUID(),...payload,...roomSnapshot,status:'new',createdAt:new Date().toISOString(),source:'public'});
       }
       const result=await env.DB.prepare('UPDATE app_state SET data=?,version=version+1,updated_at=? WHERE org_id=? AND version=?').bind(JSON.stringify(fresh.state),new Date().toISOString(),fresh.org_id,fresh.version).run();
       if(Number(result.meta?.changes||0)===1){
-        await writeAudit(env,{orgId:fresh.org_id,action:mode==='direct'?'public_booking_direct':'public_booking_request',details:{roomId,from,to,fromTime:payload.fromTime,toTime:payload.toTime},ip:requestIp(request)});
+        await writeAudit(env,{orgId:fresh.org_id,action:mode==='direct'?'public_booking_direct':'public_booking_request',details:{roomId,roomName:roomSnapshot.roomName,roomLocation:roomSnapshot.roomLocation,from,to,fromTime:payload.fromTime,toTime:payload.toTime},ip:requestIp(request)});
         return mode==='direct'?json({ok:true,mode,message:'Die Buchung wurde verbindlich bestätigt.'},201):json({ok:true,mode,message:'Buchungsanfrage wurde gesendet.'},201);
       }
     }
