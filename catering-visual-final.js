@@ -20,60 +20,72 @@
     document.head.appendChild(style);
   }
 
-  function updateSelectionBar(){
+  function ensureBar(){
     const select=document.getElementById('bookingCatering');
-    if(!select)return;
+    if(!select)return null;
     let bar=document.getElementById('bookingCateringSelectedBar');
     if(!bar){
       bar=document.createElement('div');
       bar.id='bookingCateringSelectedBar';
       bar.className='catering-selection-bar';
       const note=document.getElementById('bookingCateringNoteField');
-      (note||select.closest('.field'))?.insertAdjacentElement('beforebegin',bar);
+      if(note)note.parentNode.insertBefore(bar,note);
+      else select.closest('.field')?.insertAdjacentElement('afterend',bar);
     }
+    return bar;
+  }
+
+  function syncBar(){
+    const select=document.getElementById('bookingCatering');
+    const bar=ensureBar();
+    if(!select||!bar)return;
     const value=select.value||'';
-    const nextText=value?`Verpflegung: ${value}`:'';
-    const nextDisplay=value?'inline-flex':'none';
-    if(bar.textContent!==nextText)bar.textContent=nextText;
-    if(bar.style.display!==nextDisplay)bar.style.display=nextDisplay;
-    if(!select.dataset.cateringBarBound){
-      select.dataset.cateringBarBound='1';
-      select.addEventListener('change',updateSelectionBar);
-    }
+    if(!value){bar.style.display='none';bar.textContent='';return;}
+    bar.textContent=`Verpflegung: ${value}`;
+    bar.style.display='inline-flex';
   }
 
   function decorateDashboard(){
-    document.querySelectorAll('#dashboardBookings .row-meta').forEach(meta=>{
-      const spans=[...meta.querySelectorAll('span')];
-      const target=spans.find(s=>(s.textContent||'').trim().startsWith('Verpflegung:'));
-      if(target&&!target.classList.contains('catering-dashboard-badge'))target.classList.add('catering-dashboard-badge');
+    document.querySelectorAll('#dashboardBookings .row-meta span').forEach(span=>{
+      if((span.textContent||'').trim().startsWith('Verpflegung:'))span.classList.add('catering-dashboard-badge');
     });
   }
 
-  function refresh(){
-    addStyles();
-    updateSelectionBar();
-    decorateDashboard();
+  function afterBookingOpen(){
+    // Nur gezielt den kleinen Verpflegungs-Balken aktualisieren.
+    // Keine DOM-Beobachter, keine globalen Klick-Handler und kein renderAll.
+    setTimeout(syncBar,0);
   }
 
   addStyles();
-  refresh();
+  syncBar();
+  decorateDashboard();
 
-  // Nur auf echte Nutzeraktionen reagieren. Der frühere globale MutationObserver
-  // hat sich durch eigene DOM-Aenderungen selbst erneut ausgeloest und konnte
-  // beim Oeffnen von "Buchung bearbeiten" den Browser blockieren.
-  document.addEventListener('click',()=>setTimeout(refresh,0),true);
+  // Genau ein sehr kleiner Handler nur für das Verpflegungsfeld.
   document.addEventListener('change',event=>{
-    if(event.target?.id==='bookingCatering')updateSelectionBar();
-  },true);
+    if(event.target&&event.target.id==='bookingCatering')syncBar();
+  });
 
-  // Wenn das Buchungsfenster durch andere Module aufgebaut wird, einmal kurz
-  // nachziehen, ohne den gesamten DOM dauerhaft zu beobachten.
-  const bookingModal=document.getElementById('bookingModal');
-  if(bookingModal){
-    const modalObserver=new MutationObserver(()=>{
-      setTimeout(refresh,0);
-    });
-    modalObserver.observe(bookingModal,{attributes:true,attributeFilter:['class']});
+  // Beim Öffnen/Bearbeiten einmal synchronisieren, ohne die Ansicht neu zu rendern.
+  if(typeof editBooking==='function'&&!editBooking._cateringVisualSafe){
+    const originalEditBooking=editBooking;
+    const wrappedEditBooking=function(...args){
+      const result=originalEditBooking.apply(this,args);
+      afterBookingOpen();
+      return result;
+    };
+    wrappedEditBooking._cateringVisualSafe=true;
+    editBooking=wrappedEditBooking;
+  }
+
+  if(typeof openBookingModal==='function'&&!openBookingModal._cateringVisualSafe){
+    const originalOpenBookingModal=openBookingModal;
+    const wrappedOpenBookingModal=function(...args){
+      const result=originalOpenBookingModal.apply(this,args);
+      afterBookingOpen();
+      return result;
+    };
+    wrappedOpenBookingModal._cateringVisualSafe=true;
+    openBookingModal=wrappedOpenBookingModal;
   }
 })();
