@@ -20,7 +20,7 @@
     document.head.appendChild(style);
   }
 
-  function ensureSelectionBar(){
+  function updateSelectionBar(){
     const select=document.getElementById('bookingCatering');
     if(!select)return;
     let bar=document.getElementById('bookingCateringSelectedBar');
@@ -31,38 +31,49 @@
       const note=document.getElementById('bookingCateringNoteField');
       (note||select.closest('.field'))?.insertAdjacentElement('beforebegin',bar);
     }
-    const update=()=>{
-      const value=select.value||'';
-      if(!value){bar.style.display='none';bar.textContent='';return;}
-      bar.style.display='inline-flex';
-      bar.textContent=`Verpflegung: ${value}`;
-    };
+    const value=select.value||'';
+    const nextText=value?`Verpflegung: ${value}`:'';
+    const nextDisplay=value?'inline-flex':'none';
+    if(bar.textContent!==nextText)bar.textContent=nextText;
+    if(bar.style.display!==nextDisplay)bar.style.display=nextDisplay;
     if(!select.dataset.cateringBarBound){
       select.dataset.cateringBarBound='1';
-      select.addEventListener('change',update);
+      select.addEventListener('change',updateSelectionBar);
     }
-    update();
   }
 
   function decorateDashboard(){
     document.querySelectorAll('#dashboardBookings .row-meta').forEach(meta=>{
-      const text=meta.textContent||'';
-      const match=text.match(/Verpflegung:\s*([^\n]+)/i);
-      if(!match||meta.querySelector('.catering-dashboard-badge'))return;
       const spans=[...meta.querySelectorAll('span')];
       const target=spans.find(s=>(s.textContent||'').trim().startsWith('Verpflegung:'));
-      if(target)target.classList.add('catering-dashboard-badge');
+      if(target&&!target.classList.contains('catering-dashboard-badge'))target.classList.add('catering-dashboard-badge');
     });
   }
 
   function refresh(){
     addStyles();
-    ensureSelectionBar();
+    updateSelectionBar();
     decorateDashboard();
   }
 
+  addStyles();
   refresh();
+
+  // Nur auf echte Nutzeraktionen reagieren. Der frühere globale MutationObserver
+  // hat sich durch eigene DOM-Aenderungen selbst erneut ausgeloest und konnte
+  // beim Oeffnen von "Buchung bearbeiten" den Browser blockieren.
   document.addEventListener('click',()=>setTimeout(refresh,0),true);
-  const observer=new MutationObserver(()=>refresh());
-  observer.observe(document.body,{subtree:true,childList:true});
+  document.addEventListener('change',event=>{
+    if(event.target?.id==='bookingCatering')updateSelectionBar();
+  },true);
+
+  // Wenn das Buchungsfenster durch andere Module aufgebaut wird, einmal kurz
+  // nachziehen, ohne den gesamten DOM dauerhaft zu beobachten.
+  const bookingModal=document.getElementById('bookingModal');
+  if(bookingModal){
+    const modalObserver=new MutationObserver(()=>{
+      setTimeout(refresh,0);
+    });
+    modalObserver.observe(bookingModal,{attributes:true,attributeFilter:['class']});
+  }
 })();
