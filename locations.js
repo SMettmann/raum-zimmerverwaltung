@@ -2,6 +2,9 @@
   if(window.__raumsuiteLocationsLoaded)return;
   window.__raumsuiteLocationsLoaded=true;
 
+  sessionStorage.removeItem('raumsuite_presentation_backup');
+  sessionStorage.removeItem('raumsuite_presentation_request');
+
   const KEY='raumsuite_active_location';
   let active=localStorage.getItem(KEY)||'all';
   let refreshing=false;
@@ -100,9 +103,7 @@
     select.value=active;updateSummary();
   }
 
-  window.setSite=function(value){
-    active=value;localStorage.setItem(KEY,value);renderAll();injectSwitch();
-  };
+  window.setSite=function(value){active=value;localStorage.setItem(KEY,value);renderAll();injectSwitch();};
 
   function filtered(fn,args,ctx){
     if(active==='all'||typeof fn!=='function')return fn?.apply(ctx,args);
@@ -170,11 +171,7 @@
 
   function settingsPanel(){
     const grid=document.querySelector('#page-settings .settings-grid');if(!grid)return;
-    let panel=document.getElementById('sitePanel');
-    if(!panel){
-      grid.insertAdjacentHTML('beforeend','<div class="panel" id="sitePanel"><h2>Standorte</h2><p class="muted">Mehrere Häuser gemeinsam verwalten und oben gezielt filtern.</p><div class="field"><label>Standorte (mit Komma trennen)</label><input id="siteNames"></div><button class="btn primary" onclick="saveSites()">Standorte speichern</button></div>');
-      panel=document.getElementById('sitePanel');
-    }
+    if(!document.getElementById('sitePanel'))grid.insertAdjacentHTML('beforeend','<div class="panel" id="sitePanel"><h2>Standorte</h2><p class="muted">Mehrere Häuser gemeinsam verwalten und oben gezielt filtern.</p><div class="field"><label>Standorte (mit Komma trennen)</label><input id="siteNames"></div><button class="btn primary" onclick="saveSites()">Standorte speichern</button></div>');
     const input=document.getElementById('siteNames');if(input)input.value=locationList().join(', ');
   }
   window.saveSites=function(){
@@ -184,9 +181,10 @@
   };
 
   async function afterStateLoad(){
-    const changed=ensureLocations()||migrateSeedAssignments();
+    const locationChanged=ensureLocations();
+    const seedChanged=migrateSeedAssignments();
     injectSwitch();settingsPanel();
-    if(changed&&typeof persist==='function')persist();
+    if((locationChanged||seedChanged)&&typeof persist==='function')persist();
   }
   if(typeof loadCloudState==='function'){
     const original=loadCloudState;
@@ -196,10 +194,17 @@
     const original=renderSettings;renderSettings=function(...args){const result=original.apply(this,args);settingsPanel();return result;};
   }
 
-  window.addEventListener('focus',async()=>{
-    if(refreshing||cloud?.mode!=='online'||!document.querySelector('#page-online.active'))return;
-    refreshing=true;try{await loadCloudState();if(typeof renderOnlineRequests==='function')renderOnlineRequests();}finally{refreshing=false;}
-  });
+  async function refreshOnlineRequests(){
+    if(refreshing||cloud?.mode!=='online')return;
+    refreshing=true;
+    try{await loadCloudState();if(typeof renderOnlineRequests==='function')renderOnlineRequests();}
+    finally{refreshing=false;}
+  }
+  window.addEventListener('focus',()=>{if(document.querySelector('#page-online.active'))refreshOnlineRequests();});
+  document.addEventListener('click',event=>{
+    const button=event.target.closest?.('#nav button[data-page="online"]');
+    if(button)setTimeout(refreshOnlineRequests,0);
+  },true);
 
   setTimeout(afterStateLoad,0);
 })();
