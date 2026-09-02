@@ -1,6 +1,8 @@
 let publicRooms=[];let selectedRoom='';let currentAvailable=[];let bookingMode='request';
 const WORKER_ORIGIN='https://raumsuite.mettmannsven8.workers.dev';
 const staticGithubHost=location.hostname.endsWith('github.io');
+const publicOrgId=new URLSearchParams(location.search).get('org')||'';
+const apiPath=path=>publicOrgId?`${path}?org=${encodeURIComponent(publicOrgId)}`:path;
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 const timedType=type=>['Seminarraum','Besprechungsraum','Veranstaltungsraum'].includes(String(type||''));
 const roomIsTimed=room=>room?.timed===true||timedType(room?.type);
@@ -13,7 +15,7 @@ if(staticGithubHost){location.replace(`${WORKER_ORIGIN}/booking.html${location.s
 async function responseJson(r){const text=await r.text();try{return text?JSON.parse(text):{}}catch{throw new Error('Die Buchungsseite konnte keine gültige Antwort vom RAUMSUITE-Backend laden.')}}
 async function boot(){
   try{
-    const r=await fetch('/api/public/config',{headers:{Accept:'application/json'}}),d=await responseJson(r);
+    const r=await fetch(apiPath('/api/public/config'),{headers:{Accept:'application/json'}}),d=await responseJson(r);
     if(!r.ok)throw new Error(d.error||'Online-Buchung ist noch nicht aktiv.');
     document.getElementById('orgName').textContent=d.organization||'Online-Buchung';
     publicRooms=Array.isArray(d.rooms)?d.rooms:[];bookingMode=d.mode==='direct'?'direct':'request';applyBookingMode();renderAvailableRooms();
@@ -42,7 +44,7 @@ async function checkAvailability(){
   hideMessages();const from=v('from'),to=v('to'),fromTime=v('fromTime'),toTime=v('toTime');
   if(!validPeriod(from,to,fromTime,toTime))return showError('Bitte einen gültigen Zeitraum und passende Uhrzeiten auswählen.');
   try{
-    const r=await fetch('/api/public/availability',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({from,to,fromTime,toTime})}),d=await responseJson(r);
+    const r=await fetch(apiPath('/api/public/availability'),{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({from,to,fromTime,toTime})}),d=await responseJson(r);
     if(!r.ok)throw new Error(d.error||'Verfügbarkeit konnte nicht geprüft werden.');
     selectedRoom='';currentAvailable=Array.isArray(d.rooms)?d.rooms:[];renderAvailableRooms();
     if(!currentAvailable.length)document.getElementById('availabilityNote').textContent='In diesem Zeitraum ist aktuell kein Raum oder Zimmer verfügbar.';
@@ -62,7 +64,7 @@ async function sendRequest(){
   if(roomIsTimed(room)&&!validPeriod(payload.from,payload.to,payload.fromTime,payload.toTime))return showError('Bitte gültige Uhrzeiten für diesen Raum angeben.');
   if(room&&payload.participants>Number(room.capacity||1))return showError(`Dieser Raum ist für maximal ${Number(room.capacity)||1} Personen ausgelegt.`);
   try{
-    const r=await fetch('/api/public/request',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(payload)}),d=await responseJson(r);
+    const r=await fetch(apiPath('/api/public/request'),{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(payload)}),d=await responseJson(r);
     if(!r.ok)throw new Error(d.error||(bookingMode==='direct'?'Buchung konnte nicht abgeschlossen werden.':'Anfrage konnte nicht gesendet werden.'));
     document.getElementById('success').style.display='block';
     document.getElementById('success').textContent=d.message||(d.mode==='direct'?'Die Buchung wurde verbindlich bestätigt.':'Danke! Die Buchungsanfrage wurde an die Einrichtung übermittelt.');
