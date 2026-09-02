@@ -35,10 +35,10 @@ function addDirectBooking(state,room,data){
 
 async function handlePublicTimed(request,env,url){
   if(request.method!=='GET'&&request.method!=='HEAD'&&!sameOrigin(request,url))return json({error:'Ungültiger Ursprung.'},403);
-  const data=await loadOrgState(env);if(!data)return json({error:'RAUMWERK ist noch nicht eingerichtet.'},503);
+  const data=await loadOrgState(env);if(!data)return json({error:'RAUMSUITE ist noch nicht eingerichtet.'},503);
 
   if(url.pathname==='/api/public/config'&&request.method==='GET'){
-    return json({organization:data.org_name,mode:bookingMode(data.state),rooms:(data.state.rooms||[]).map(r=>({id:r.id,name:r.name,type:r.type,capacity:r.capacity||1,note:r.note||'',timed:isTimedRoomType(r.type)}))});
+    return json({organization:data.org_name,mode:bookingMode(data.state),rooms:(data.state.rooms||[]).map(r=>({id:r.id,name:r.name,type:r.type,capacity:r.capacity||1,note:r.note||'',location:r.location||'',timed:isTimedRoomType(r.type)}))});
   }
 
   if(url.pathname==='/api/public/availability'&&request.method==='POST'){
