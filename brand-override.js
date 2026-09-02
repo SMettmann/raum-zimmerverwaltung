@@ -48,15 +48,39 @@
 
   if(bookingPage)return;
 
+  function currentBookingUrl(){
+    const url=new URL('booking.html',location.href);
+    const orgId=window.raumwerkCloud?.organization?.id||'';
+    if(orgId)url.searchParams.set('org',orgId);
+    return url;
+  }
+
+  document.addEventListener('click',event=>{
+    const link=event.target.closest?.('a[href*="booking.html"]');
+    if(!link)return;
+    const url=currentBookingUrl();
+    if(!url.searchParams.get('org'))return;
+    event.preventDefault();
+    window.open(url.href,link.target||'_self');
+  },true);
+
+  if(typeof window.copyBookingLink==='function'){
+    window.copyBookingLink=function(){
+      const url=currentBookingUrl();
+      navigator.clipboard?.writeText(url.href);
+      if(typeof toast==='function')toast('Buchungslink kopiert');
+    };
+  }
+
   window.addEventListener('load',()=>{
     const afterCatering=()=>{
-      loadScript('locations.js?v=20260902-8',()=>{
-        loadScript('catering-visual-final.js?v=20260902-8',()=>{
-          loadScript('booking-table-final.js?v=20260902-8');
+      loadScript('locations.js?v=20260902-9',()=>{
+        loadScript('catering-visual-final.js?v=20260902-9',()=>{
+          loadScript('booking-table-final.js?v=20260902-9');
         });
       });
     };
     if(window.__raumsuiteCateringLoaded)afterCatering();
-    else loadScript('catering-booking.js?v=20260902-8',afterCatering);
+    else loadScript('catering-booking.js?v=20260902-9',afterCatering);
   },{once:true});
 })();
