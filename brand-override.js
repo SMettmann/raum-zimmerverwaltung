@@ -90,18 +90,18 @@
       };
     }
 
-    loadScript('location-demo.js?v=20260902-3',()=>{
-      loadScript('presentation-invoices.js?v=20260902-3');
+    loadScript('location-demo.js?v=20260902-4',()=>{
+      loadScript('presentation-invoices.js?v=20260902-4');
     });
 
     window.addEventListener('load',()=>{
       const afterCatering=()=>{
-        loadScript('location-filter-final.js?v=20260902-3',()=>{
-          loadScript('catering-visual-final.js?v=20260902-3');
+        loadScript('location-filter-final.js?v=20260902-4',()=>{
+          loadScript('catering-visual-final.js?v=20260902-4');
         });
       };
       if(window.__raumsuiteCateringLoaded)afterCatering();
-      else loadScript('catering-booking.js?v=20260902-3',afterCatering);
+      else loadScript('catering-booking.js?v=20260902-4',afterCatering);
     },{once:true});
   }
 })();
