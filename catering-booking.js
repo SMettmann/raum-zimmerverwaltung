@@ -1,4 +1,19 @@
 (function(){
+  if(window.__raumsuiteCateringLoaded)return;
+  window.__raumsuiteCateringLoaded=true;
+
+  function injectStyles(){
+    if(document.getElementById('raumsuiteCateringStyles'))return;
+    const style=document.createElement('style');
+    style.id='raumsuiteCateringStyles';
+    style.textContent=`
+      .cal-catering{display:block;font-size:10px;line-height:1.2;opacity:.82;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .booking-catering-cell{min-width:145px}
+      .booking-catering-cell .row-meta{margin-top:2px}
+    `;
+    document.head.appendChild(style);
+  }
+
   function injectFields(){
     if(document.getElementById('bookingCatering'))return;
     const noteField=document.getElementById('bookingNote')?.closest('.field');
@@ -53,13 +68,92 @@
     if(note)note.value=b?.cateringNote||'';
   }
 
-  function cateringSummary(b){
+  function cateringSummary(b,prefix=true){
     if(!b?.catering)return '';
     const people=b.cateringParticipants?` · ${b.cateringParticipants} Pers.`:'';
-    return `Verpflegung: ${b.catering}${people}`;
+    return `${prefix?'Verpflegung: ':''}${b.catering}${people}`;
   }
 
+  function ensureBookingTableHeader(){
+    const row=document.querySelector('#bookingListPanel table thead tr');
+    if(!row||row.querySelector('[data-catering-head]'))return;
+    const status=[...row.children].find(th=>th.textContent.trim()==='Status');
+    const th=document.createElement('th');
+    th.dataset.cateringHead='1';
+    th.textContent='Verpflegung';
+    row.insertBefore(th,status||row.lastElementChild);
+  }
+
+  function renderCateringBookingTable(){
+    const body=document.getElementById('bookingTable');
+    if(!body)return;
+    ensureBookingTableHeader();
+    const q=(document.getElementById('bookingSearch')?.value||'').toLowerCase();
+    const list=[...bookings]
+      .filter(b=>[b.guest,roomName(b.roomId),b.purpose,b.from,b.to,b.catering,b.cateringNote,b.cateringParticipants].join(' ').toLowerCase().includes(q))
+      .sort((a,b)=>b.from.localeCompare(a.from));
+    body.innerHTML=list.length?list.map(b=>{
+      const st=bookingState(b);
+      const catering=b.catering
+        ?`<strong>${esc(b.catering)}</strong>${b.cateringParticipants?`<div class="row-meta">${esc(b.cateringParticipants)} Personen</div>`:''}${b.cateringNote?`<div class="row-meta">${esc(b.cateringNote)}</div>`:''}`
+        :'–';
+      return `<tr><td>${fmtDate(b.from)} – ${fmtDate(b.to)}</td><td><strong>${esc(b.guest)}</strong></td><td>${esc(roomName(b.roomId))}</td><td>${esc(b.purpose||'–')}</td><td class="booking-catering-cell">${catering}</td><td><span class="badge ${st[1]}">${st[0]}</span></td><td><div class="row-actions"><button class="btn small" onclick="editBooking('${b.id}')">Bearbeiten</button><button class="btn small danger" onclick="deleteBooking('${b.id}')">Löschen</button></div></td></tr>`;
+    }).join(''):'<tr><td colspan="7"><div class="empty">Keine Buchungen gefunden.</div></td></tr>';
+  }
+
+  function decorateCalendarCatering(){
+    document.querySelectorAll('#calendarGrid .cal-event').forEach(event=>{
+      event.querySelector('.cal-catering')?.remove();
+      const onclick=event.getAttribute('onclick')||'';
+      const id=onclick.match(/editBooking\(['\"]([^'\"]+)['\"]\)/)?.[1];
+      const b=id?bookings.find(x=>x.id===id):null;
+      if(!b?.catering)return;
+      const line=document.createElement('span');
+      line.className='cal-catering';
+      line.textContent=cateringSummary(b,false);
+      event.appendChild(line);
+      event.title=`${b.guest} – ${roomName(b.roomId)} – ${cateringSummary(b)}`;
+    });
+  }
+
+  function decorateDashboardCatering(){
+    const rows=[...document.querySelectorAll('#dashboardBookings > .row')];
+    if(!rows.length)return;
+    const t=todayIso();
+    const upcoming=[...bookings].filter(b=>b.status!=='cancelled'&&b.to>=t).sort((a,b)=>a.from.localeCompare(b.from)).slice(0,6);
+    rows.forEach((row,i)=>{
+      const b=upcoming[i];
+      const meta=row.querySelector('.row-meta');
+      if(!b?.catering||!meta||meta.dataset.cateringAdded)return;
+      meta.dataset.cateringAdded='1';
+      meta.insertAdjacentHTML('beforeend',`<br><span>${esc(cateringSummary(b))}</span>`);
+    });
+  }
+
+  function applyDemoCatering(){
+    if(typeof bookings==='undefined'||!Array.isArray(bookings))return;
+    const isDemo=settings?.org==='Tagungs- & Gästehaus Beispiel'||bookings.some(b=>b.id==='b1'&&b.guest==='Bildungsforum Beispiel e.V.');
+    if(!isDemo)return;
+    const examples={
+      b1:['Vollverpflegung',46,'Vegetarische Optionen berücksichtigen'],
+      b3:['Halbpension',28,'Abendessen am Anreisetag'],
+      b4:['Vollverpflegung',54,'Vegetarisch und Allergien nach Teilnehmerliste'],
+      b8:['Selbstversorgung',24,'Nutzung der vorhandenen Selbstversorgerküche']
+    };
+    let changed=false;
+    for(const [id,[catering,count,note]] of Object.entries(examples)){
+      const b=bookings.find(x=>x.id===id);
+      if(b&&(!b.catering||!b.cateringParticipants)){
+        Object.assign(b,{catering,cateringParticipants:count,cateringNote:b.cateringNote||note});
+        changed=true;
+      }
+    }
+    if(changed&&typeof persistLocal==='function')persistLocal();
+  }
+
+  injectStyles();
   injectFields();
+  applyDemoCatering();
 
   if(typeof openBookingModal==='function'){
     const original=openBookingModal;
@@ -108,19 +202,25 @@
     const original=renderBookingTable;
     renderBookingTable=function(...args){
       const result=original.apply(this,args);
-      const body=document.getElementById('bookingTable');
-      if(!body)return result;
-      const q=(document.getElementById('bookingSearch')?.value||'').toLowerCase();
-      const list=[...bookings].filter(b=>[b.guest,roomName(b.roomId),b.purpose,b.from,b.to,b.catering,b.cateringNote].join(' ').toLowerCase().includes(q)).sort((a,b)=>b.from.localeCompare(a.from));
-      [...body.querySelectorAll('tr')].forEach((tr,i)=>{
-        const b=list[i];
-        const cell=tr.children?.[3];
-        if(!b||!cell||!b.catering)return;
-        const line=document.createElement('div');
-        line.className='row-meta';
-        line.textContent=cateringSummary(b)+(b.cateringNote?` · ${b.cateringNote}`:'');
-        cell.appendChild(line);
-      });
+      renderCateringBookingTable();
+      return result;
+    };
+  }
+
+  if(typeof renderCalendar==='function'){
+    const original=renderCalendar;
+    renderCalendar=function(...args){
+      const result=original.apply(this,args);
+      decorateCalendarCatering();
+      return result;
+    };
+  }
+
+  if(typeof renderDashboard==='function'){
+    const original=renderDashboard;
+    renderDashboard=function(...args){
+      const result=original.apply(this,args);
+      decorateDashboardCatering();
       return result;
     };
   }
@@ -152,17 +252,7 @@
       const original=window.startPresentation;
       const wrapped=function(...args){
         const result=original.apply(this,args);
-        const examples={
-          b1:['Vollverpflegung',46,'Vegetarische Optionen berücksichtigen'],
-          b3:['Halbpension',28,'Abendessen am Anreisetag'],
-          b4:['Vollverpflegung',54,'Vegetarisch und Allergien nach Teilnehmerliste'],
-          b8:['Selbstversorgung',24,'Nutzung der vorhandenen Selbstversorgerküche']
-        };
-        for(const [id,[catering,count,note]] of Object.entries(examples)){
-          const b=bookings.find(x=>x.id===id);
-          if(b)Object.assign(b,{catering,cateringParticipants:count,cateringNote:note});
-        }
-        if(typeof persistLocal==='function')persistLocal();
+        applyDemoCatering();
         renderAll();
         return result;
       };
@@ -172,4 +262,10 @@
     }
     if(attempts>100)clearInterval(timer);
   },100);
+
+  setTimeout(()=>{
+    applyDemoCatering();
+    injectFields();
+    if(typeof renderAll==='function')renderAll();
+  },0);
 })();
