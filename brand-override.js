@@ -80,7 +80,9 @@
             loadScript('catering-visual-final.js?v=20260903-2',()=>{
               loadScript('booking-table-final.js?v=20260903-2',()=>{
                 loadScript('catering-persistence-final.js?v=20260903-2',()=>{
-                  loadScript('guest-delete.js?v=20260903-1');
+                  loadScript('guest-delete.js?v=20260903-1',()=>{
+                    loadScript('no-input-suggestions.js?v=20260903-1');
+                  });
                 });
               });
             });
