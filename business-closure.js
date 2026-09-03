@@ -13,6 +13,32 @@
     return (blocks||[]).some(b=>isWholeOperation(b)&&overlapsDate(from,to,b.from,b.to));
   };
 
+  // Zusätzliche feste Prüfung direkt beim Speichern. Damit können Betriebsferien
+  // auch dann nicht umgangen werden, wenn andere Module bookingConflict später überschreiben.
+  const previousSaveBooking=typeof saveBooking==='function'?saveBooking:null;
+  if(previousSaveBooking){
+    saveBooking=function(...args){
+      const id=document.getElementById('bookingId')?.value||'';
+      const roomId=document.getElementById('bookingRoom')?.value||'';
+      const from=document.getElementById('bookingFrom')?.value||'';
+      const to=document.getElementById('bookingTo')?.value||'';
+      const status=document.getElementById('bookingStatus')?.value||'confirmed';
+      const closure=(blocks||[]).find(b=>isWholeOperation(b)&&from&&to&&overlapsDate(from,to,b.from,b.to));
+
+      if(status!=='cancelled'&&closure){
+        const existing=id?(bookings||[]).find(b=>b.id===id):null;
+        const unchangedExisting=existing&&existing.roomId===roomId&&existing.from===from&&existing.to===to;
+        if(!unchangedExisting){
+          const message=`Betriebsferien: Der gesamte Betrieb ist vom ${fmtDate(closure.from)} bis ${fmtDate(closure.to)} geschlossen. In diesem Zeitraum kann keine Buchung angelegt werden.`;
+          if(typeof showFormError==='function')showFormError('bookingError',message);
+          else alert(message);
+          return;
+        }
+      }
+      return previousSaveBooking.apply(this,args);
+    };
+  }
+
   function visibleRooms(){
     const active=localStorage.getItem('raumsuite_active_location')||'all';
     if(active==='all')return rooms||[];
