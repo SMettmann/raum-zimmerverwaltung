@@ -2,6 +2,7 @@ import app from './email-entry.js';
 
 const enc=new TextEncoder();
 const PBKDF2_ITERATIONS=100000;
+const SESSION_DAYS=14;
 
 export default {
   async fetch(request,env,ctx){
@@ -18,9 +19,15 @@ export default {
       if(!next.includes('task-history-undo.js'))next=next.replace('</body>','<script src="task-history-undo.js"></script></body>');
       if(!next.includes('live-test-fixes-round-two.js'))next=next.replace('</body>','<script src="live-test-fixes-round-two.js"></script></body>');
       if(!next.includes('catering-booking.js'))next=next.replace('</body>','<script src="catering-booking.js"></script></body>');
+      if(!next.includes('registration-ui.js'))next=next.replace('</body>','<script src="registration-ui.js?v=20260903-1"></script></body>');
       if(next===html)return new Response(html,{status:response.status,headers:response.headers});
       const headers=new Headers(response.headers);headers.delete('Content-Length');
       return new Response(next,{status:response.status,statusText:response.statusText,headers});
+    }
+    if(url.pathname==='/api/register'&&request.method==='POST'){
+      if(!sameOrigin(request,url))return json({error:'Ungültiger Ursprung.'},403);
+      try{return await registerOrganization(request,env)}
+      catch(e){console.error('registration_error',e);return json({error:'Registrierung konnte nicht abgeschlossen werden.'},500)}
     }
     if(url.pathname==='/api/password/change'&&request.method==='POST'){
       if(!sameOrigin(request,url))return json({error:'Ungültiger Ursprung.'},403);
@@ -36,6 +43,39 @@ export default {
     return app.fetch(request,env,ctx);
   }
 };
+
+async function registerOrganization(request,env){
+  const body=await readJson(request);
+  const organization=clean(body.organization,160);
+  const name=clean(body.name,120);
+  const email=cleanEmail(body.email);
+  const password=String(body.password||'');
+  if(!organization||!name||!email||password.length<10)return json({error:'Einrichtung, Name, gültige E-Mail und Passwort mit mindestens 10 Zeichen angeben.'},400);
+
+  const existing=await env.DB.prepare('SELECT id FROM users WHERE email=?').bind(email).first();
+  if(existing)return json({error:'Für diese E-Mail-Adresse besteht bereits ein Zugang. Bitte anmelden.'},409);
+
+  const orgId=crypto.randomUUID();
+  const userId=crypto.randomUUID();
+  const now=new Date().toISOString();
+  const salt=randomToken(16);
+  const hash=await hashPassword(password,salt);
+  const state={rooms:[],bookings:[],guests:[],tasks:[],settings:{org:organization,email:'',phone:'',address:'',locations:[]}};
+
+  await env.DB.batch([
+    env.DB.prepare('INSERT INTO organizations (id,name,created_at) VALUES (?,?,?)').bind(orgId,organization,now),
+    env.DB.prepare('INSERT INTO users (id,org_id,name,email,password_hash,password_salt,role,active,created_at) VALUES (?,?,?,?,?,?,?,?,?)').bind(userId,orgId,name,email,hash,salt,'admin',1,now),
+    env.DB.prepare('INSERT INTO app_state (org_id,version,data,updated_at,updated_by) VALUES (?,1,?,?,?)').bind(orgId,JSON.stringify(state),now,userId)
+  ]);
+
+  const token=randomToken(32);
+  const tokenHash=await sha256(token);
+  const expires=new Date(Date.now()+SESSION_DAYS*86400000).toISOString();
+  await env.DB.prepare('INSERT INTO sessions (token_hash,user_id,expires_at,created_at) VALUES (?,?,?,?)').bind(tokenHash,userId,expires,now).run();
+  await writeAudit(env,{orgId,userId,action:'organization_registered',details:{organization}});
+
+  return json({ok:true,user:{id:userId,name,email,role:'admin'},organization:{id:orgId,name:organization}},201,{'Set-Cookie':sessionCookie(token,SESSION_DAYS*86400)});
+}
 
 async function changeOwnPassword(request,env){
   const auth=await passwordUserFromSession(request,env);
@@ -87,6 +127,9 @@ function randomToken(bytes){const data=crypto.getRandomValues(new Uint8Array(byt
 function hex(bytes){return [...bytes].map(b=>b.toString(16).padStart(2,'0')).join('')}
 function getCookie(request,name){const cookies=request.headers.get('Cookie')||'';for(const part of cookies.split(';')){const [key,...rest]=part.trim().split('=');if(key===name)return rest.join('=')}return ''}
 function sameOrigin(request,url){const origin=request.headers.get('Origin');return !origin||origin===url.origin}
+function clean(value,max=160){return String(value||'').trim().slice(0,max)}
+function cleanEmail(value){const email=clean(value,180).toLowerCase();return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)?email:''}
+function sessionCookie(token,maxAge){return `raumwerk_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`}
 async function readJson(request){try{return await request.json()}catch{return {}}}
 async function writeAudit(env,{orgId,userId,action,details={}}){await env.DB.prepare('INSERT INTO audit_log (id,org_id,user_id,action,details,ip,created_at) VALUES (?,?,?,?,?,?,?)').bind(crypto.randomUUID(),orgId,userId,action,JSON.stringify(details),'',new Date().toISOString()).run()}
-function json(data,status=200){return new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}})}
+function json(data,status=200,extraHeaders={}){return new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...extraHeaders}})}
