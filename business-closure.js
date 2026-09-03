@@ -5,31 +5,46 @@
   const ALL='__all__';
   const isWholeOperation=b=>b?.scope==='all'||b?.roomId===ALL;
   const overlapsDate=(aFrom,aTo,bFrom,bTo)=>aFrom<=bTo&&aTo>=bFrom;
+  const blockApplies=(b,roomId)=>isWholeOperation(b)||b?.roomId===roomId;
 
   const previousBookingConflict=typeof bookingConflict==='function'?bookingConflict:null;
   bookingConflict=function(roomId,from,to,ignoreId=''){
     const base=previousBookingConflict?previousBookingConflict(roomId,from,to,ignoreId):false;
     if(base)return true;
-    return (blocks||[]).some(b=>isWholeOperation(b)&&overlapsDate(from,to,b.from,b.to));
+    return (blocks||[]).some(b=>blockApplies(b,roomId)&&overlapsDate(from,to,b.from,b.to));
   };
 
-  // Zusätzliche feste Prüfung direkt beim Speichern. Damit können Betriebsferien
-  // auch dann nicht umgangen werden, wenn andere Module bookingConflict später überschreiben.
-  const previousSaveBooking=typeof saveBooking==='function'?saveBooking:null;
-  if(previousSaveBooking){
-    saveBooking=function(...args){
+  function matchingBlock(roomId,from,to){
+    if(!roomId||!from||!to)return null;
+    return (blocks||[]).find(b=>blockApplies(b,roomId)&&overlapsDate(from,to,b.from,b.to))||null;
+  }
+
+  function blockedMessage(block,roomId){
+    if(isWholeOperation(block)){
+      return `Betriebsferien: Der gesamte Betrieb ist vom ${fmtDate(block.from)} bis ${fmtDate(block.to)} geschlossen. In diesem Zeitraum kann keine Buchung angelegt werden.`;
+    }
+    const reason=String(block.type||'Sperrzeit').trim();
+    return `Sperrzeit: ${roomName(roomId)} ist vom ${fmtDate(block.from)} bis ${fmtDate(block.to)} gesperrt${reason?` (${reason})`:''}. In diesem Zeitraum kann keine Buchung angelegt werden.`;
+  }
+
+  function installBookingGuard(){
+    if(typeof saveBooking!=='function')return false;
+    if(saveBooking._raumsuiteBlockGuard)return true;
+
+    const previousSaveBooking=saveBooking;
+    const guarded=function(...args){
       const id=document.getElementById('bookingId')?.value||'';
       const roomId=document.getElementById('bookingRoom')?.value||'';
       const from=document.getElementById('bookingFrom')?.value||'';
       const to=document.getElementById('bookingTo')?.value||'';
       const status=document.getElementById('bookingStatus')?.value||'confirmed';
-      const closure=(blocks||[]).find(b=>isWholeOperation(b)&&from&&to&&overlapsDate(from,to,b.from,b.to));
+      const block=matchingBlock(roomId,from,to);
 
-      if(status!=='cancelled'&&closure){
+      if(status!=='cancelled'&&block){
         const existing=id?(bookings||[]).find(b=>b.id===id):null;
         const unchangedExisting=existing&&existing.roomId===roomId&&existing.from===from&&existing.to===to;
         if(!unchangedExisting){
-          const message=`Betriebsferien: Der gesamte Betrieb ist vom ${fmtDate(closure.from)} bis ${fmtDate(closure.to)} geschlossen. In diesem Zeitraum kann keine Buchung angelegt werden.`;
+          const message=blockedMessage(block,roomId);
           if(typeof showFormError==='function')showFormError('bookingError',message);
           else alert(message);
           return;
@@ -37,7 +52,22 @@
       }
       return previousSaveBooking.apply(this,args);
     };
+    guarded._raumsuiteBlockGuard=true;
+    guarded._raumsuiteBlockGuardPrevious=previousSaveBooking;
+    saveBooking=guarded;
+    return true;
   }
+
+  // Mehrere Zusatzmodule setzen saveBooking nach dem Seitenstart neu. Deshalb wird
+  // der Sperr-Guard nachgeladen und bei einer späteren Überschreibung erneut als
+  // äußerste Schutzschicht gesetzt. So kann kein internes Buchungsformular Sperren umgehen.
+  installBookingGuard();
+  let guardChecks=0;
+  const guardTimer=setInterval(()=>{
+    guardChecks++;
+    installBookingGuard();
+    if(guardChecks>=150)clearInterval(guardTimer);
+  },100);
 
   function visibleRooms(){
     const active=localStorage.getItem('raumsuite_active_location')||'all';
@@ -106,5 +136,5 @@
     }).join(''):'<div class="empty">Keine Sperrzeiten. Alle Räume sind nach Buchungslage vermietbar.</div>';
   };
 
-  setTimeout(()=>{ensureBetriebsferienOption();if(typeof renderAvailability==='function')renderAvailability();},0);
+  setTimeout(()=>{ensureBetriebsferienOption();installBookingGuard();if(typeof renderAvailability==='function')renderAvailability();},0);
 })();
