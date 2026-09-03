@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "raumsuite",
-  "main": "./worker/password-entry.js",
+  "main": "./worker/owner-protection-entry.js",
   "compatibility_date": "2026-08-21",
   "assets": {
     "directory": ".",
