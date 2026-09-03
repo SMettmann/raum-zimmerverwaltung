@@ -41,6 +41,12 @@ export default {
       try{return await resetUserPassword(request,env,decodeURIComponent(reset[1]))}
       catch(e){console.error('password_reset_error',e);return json({error:'Passwort konnte nicht neu gesetzt werden.'},500)}
     }
+    const remove=url.pathname.match(/^\/api\/users\/([^/]+)$/);
+    if(remove&&request.method==='DELETE'){
+      if(!sameOrigin(request,url))return json({error:'Ungültiger Ursprung.'},403);
+      try{return await deleteUser(request,env,decodeURIComponent(remove[1]))}
+      catch(e){console.error('user_delete_error',e);return json({error:'Benutzer konnte nicht gelöscht werden.'},500)}
+    }
     return app.fetch(request,env,ctx);
   }
 };
@@ -106,6 +112,24 @@ async function resetUserPassword(request,env,targetId){
   await env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(targetId).run();
   await writeAudit(env,{orgId:actor.org_id,userId:actor.id,action:'password_reset',details:{targetUserId:targetId,targetEmail:String(target.email||'').slice(0,180)}});
   return json({ok:true,message:'Neues Passwort wurde gesetzt. Der Benutzer muss sich erneut anmelden.'});
+}
+
+async function deleteUser(request,env,targetId){
+  const actor=await passwordUserFromSession(request,env);
+  if(!actor)return json({error:'Nicht angemeldet.'},401);
+  if(actor.role!=='admin')return json({error:'Nur Administratoren dürfen Benutzer löschen.'},403);
+  if(targetId===actor.id)return json({error:'Den eigenen Administratorzugang kannst du nicht löschen.'},400);
+  const target=await env.DB.prepare('SELECT id,name,email,role FROM users WHERE id=? AND org_id=?').bind(targetId,actor.org_id).first();
+  if(!target)return json({error:'Benutzer nicht gefunden.'},404);
+
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(targetId),
+    env.DB.prepare('UPDATE app_state SET updated_by=NULL WHERE updated_by=? AND org_id=?').bind(targetId,actor.org_id),
+    env.DB.prepare('UPDATE audit_log SET user_id=NULL WHERE user_id=? AND org_id=?').bind(targetId,actor.org_id),
+    env.DB.prepare('DELETE FROM users WHERE id=? AND org_id=?').bind(targetId,actor.org_id)
+  ]);
+  await writeAudit(env,{orgId:actor.org_id,userId:actor.id,action:'user_deleted',details:{targetUserId:targetId,targetName:String(target.name||'').slice(0,120),targetEmail:String(target.email||'').slice(0,180)}});
+  return json({ok:true,message:'Benutzer wurde endgültig gelöscht.'});
 }
 
 async function passwordUserFromSession(request,env){
