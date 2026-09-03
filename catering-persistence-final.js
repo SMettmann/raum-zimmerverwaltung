@@ -60,6 +60,20 @@
     });
   }
 
+  function resetNewBookingFields(){
+    if(document.getElementById('bookingId')?.value)return;
+    const catering=document.getElementById('bookingCatering');
+    const participants=document.getElementById('bookingCateringParticipants');
+    const cateringNote=document.getElementById('bookingCateringNote');
+    const bookingNote=document.getElementById('bookingNote');
+    if(catering)catering.value='';
+    if(participants)participants.value='';
+    if(cateringNote)cateringNote.value='';
+    if(bookingNote)bookingNote.value='';
+    const bar=document.getElementById('bookingCateringSelectedBar');
+    if(bar){bar.textContent='';bar.style.display='none';}
+  }
+
   function install(){
     if(window.__raumsuiteCateringPersistenceInstalled)return true;
     if(typeof saveBooking!=='function'||typeof renderDashboard!=='function'||typeof bookings==='undefined')return false;
@@ -67,6 +81,17 @@
 
     window.__raumsuiteCateringPersistenceInstalled=true;
     addStyles();
+
+    if(typeof openBookingModal==='function'&&!openBookingModal._raumsuiteCateringResetFinal){
+      const previousOpen=openBookingModal;
+      const wrappedOpen=function(...args){
+        const result=previousOpen.apply(this,args);
+        resetNewBookingFields();
+        return result;
+      };
+      wrappedOpen._raumsuiteCateringResetFinal=true;
+      openBookingModal=wrappedOpen;
+    }
 
     const previousSave=saveBooking;
     saveBooking=function(...args){
