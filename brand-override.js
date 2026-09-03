@@ -77,14 +77,16 @@
       loadScript('manual-setup-clean.js?v=20260903-1',()=>{
         loadScript('online-booking-final.js?v=20260903-1',()=>{
           loadScript('locations.js?v=20260903-1',()=>{
-            loadScript('catering-visual-final.js?v=20260903-1',()=>{
-              loadScript('booking-table-final.js?v=20260903-1');
+            loadScript('catering-visual-final.js?v=20260903-2',()=>{
+              loadScript('booking-table-final.js?v=20260903-2',()=>{
+                loadScript('catering-persistence-final.js?v=20260903-1');
+              });
             });
           });
         });
       });
     };
     if(window.__raumsuiteCateringLoaded)afterCatering();
-    else loadScript('catering-booking.js?v=20260903-1',afterCatering);
+    else loadScript('catering-booking.js?v=20260903-2',afterCatering);
   },{once:true});
 })();
