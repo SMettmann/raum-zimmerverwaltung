@@ -1,4 +1,5 @@
 const TIMED_ROOM_TYPES=new Set(['Seminarraum','Besprechungsraum','Veranstaltungsraum']);
+const ALL_ROOMS='__all__';
 
 export function isTimedRoomType(type){return TIMED_ROOM_TYPES.has(String(type||''))}
 export function validTime(value){return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value||''))}
@@ -19,10 +20,14 @@ export function bookingOverlaps(room,candidate,existing){
   return aStart<bEnd&&aEnd>bStart;
 }
 
+function blockAppliesToRoom(block,room){
+  return block?.scope==='all'||block?.roomId===ALL_ROOMS||block?.roomId===room.id;
+}
+
 export function roomAvailable(state,room,range){
   if(!room||!range?.from||!range?.to||range.to<range.from)return false;
   if(isTimedRoomType(room.type)&&!validTimedRange(room,range))return false;
   const booked=(state.bookings||[]).some(b=>b.roomId===room.id&&b.status!=='cancelled'&&bookingOverlaps(room,range,b));
-  const blocked=(state.blocks||[]).some(b=>b.roomId===room.id&&dateOverlap(range.from,range.to,b.from,b.to));
+  const blocked=(state.blocks||[]).some(b=>blockAppliesToRoom(b,room)&&dateOverlap(range.from,range.to,b.from,b.to));
   return !booked&&!blocked;
 }
