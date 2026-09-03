@@ -20,7 +20,7 @@ export default {
       if(!next.includes('live-test-fixes-round-two.js'))next=next.replace('</body>','<script src="live-test-fixes-round-two.js"></script></body>');
       if(!next.includes('catering-booking.js'))next=next.replace('</body>','<script src="catering-booking.js"></script></body>');
       if(!next.includes('registration-ui.js'))next=next.replace('</body>','<script src="registration-ui.js?v=20260903-1"></script></body>');
-      if(!next.includes('business-closure.js'))next=next.replace('</body>','<script src="business-closure.js?v=20260903-1"></script></body>');
+      if(!next.includes('business-closure.js'))next=next.replace('</body>','<script src="business-closure.js?v=20260903-2"></script></body>');
       if(next===html)return new Response(html,{status:response.status,headers:response.headers});
       const headers=new Headers(response.headers);headers.delete('Content-Length');
       return new Response(next,{status:response.status,statusText:response.statusText,headers});
