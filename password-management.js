@@ -3,7 +3,7 @@
   let passwordUsersById={};
   function setupPasswordUi(){
     if(!document.getElementById('passwordManagementStyle')){
-      const style=document.createElement('style');style.id='passwordManagementStyle';style.textContent=`.cloud-admin-row.password-enabled{grid-template-columns:minmax(180px,1fr) 160px 110px 135px}.password-note{font-size:12px;color:#7b8698;margin-top:7px}@media(max-width:760px){.cloud-admin-row.password-enabled{grid-template-columns:1fr}}`;document.head.appendChild(style);
+      const style=document.createElement('style');style.id='passwordManagementStyle';style.textContent=`.cloud-admin-row.password-enabled{grid-template-columns:minmax(180px,1fr) 160px 110px 135px 90px}.password-note{font-size:12px;color:#7b8698;margin-top:7px}@media(max-width:760px){.cloud-admin-row.password-enabled{grid-template-columns:1fr}}`;document.head.appendChild(style);
     }
     if(!document.getElementById('changePasswordModal'))document.body.insertAdjacentHTML('beforeend',`
       <div class="modal" id="changePasswordModal"><div class="modal-box"><div class="modal-head"><h2>Passwort ändern</h2><button class="icon-btn" onclick="closeModal('changePasswordModal')">✕</button></div><div class="form-error" id="changePasswordError"></div><div class="field"><label>Aktuelles Passwort *</label><input id="currentPassword" type="password" autocomplete="current-password"></div><div class="field"><label>Neues Passwort *</label><input id="newPassword" type="password" minlength="10" autocomplete="new-password" placeholder="Mindestens 10 Zeichen"></div><div class="field"><label>Neues Passwort wiederholen *</label><input id="repeatPassword" type="password" minlength="10" autocomplete="new-password"></div><div class="password-note">Nach der Änderung werden andere offene Sitzungen dieses Zugangs automatisch beendet.</div><div class="modal-actions"><button class="btn" onclick="closeModal('changePasswordModal')">Abbrechen</button><button class="btn primary" onclick="saveOwnPassword()">Passwort ändern</button></div></div></div>`);
@@ -37,9 +37,20 @@
     closeModal('adminPasswordModal');toast('Neues Passwort gesetzt');if(typeof loadCloudUsers==='function')await loadCloudUsers();if(typeof loadAuditLog==='function')await loadAuditLog();
   };
 
+  window.deleteCloudUser=async function(id){
+    if(cloud.user?.role!=='admin')return alert('Nur Administratoren dürfen Benutzer löschen.');
+    if(id===cloud.user?.id)return alert('Den eigenen Administratorzugang kannst du nicht löschen.');
+    const user=passwordUsersById[id];
+    if(!user)return alert('Benutzer nicht gefunden.');
+    if(!confirm(`Benutzer „${user.name}“ wirklich endgültig löschen?\n\nDer Zugang und alle aktiven Sitzungen werden gelöscht. Dieser Vorgang kann nicht rückgängig gemacht werden.`))return;
+    const res=await fetch('/api/users/'+encodeURIComponent(id),{method:'DELETE',headers:{Accept:'application/json'}});let data={};try{data=await res.json()}catch{}
+    if(!res.ok)return alert(data.error||'Benutzer konnte nicht gelöscht werden.');
+    toast('Benutzer gelöscht');if(typeof loadCloudUsers==='function')await loadCloudUsers();if(typeof loadAuditLog==='function')await loadAuditLog();
+  };
+
   loadCloudUsers=async function(){
     const res=await fetch('/api/users');if(!res.ok)return;const data=await res.json();const wrap=document.getElementById('cloudUserList');if(!wrap)return;const users=data.users||[],isAdmin=cloud.user?.role==='admin';passwordUsersById=Object.fromEntries(users.map(u=>[u.id,u]));
-    wrap.innerHTML=users.map(u=>{const self=u.id===cloud.user?.id;const roleOptions=['admin','manager','staff','cleaning','viewer'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${esc(roleLabel[r]||r)}</option>`).join('');return `<div class="cloud-admin-row password-enabled"><div><b>${esc(u.name)}</b><div class="muted">${esc(u.email)}${self?' · Du':''}</div></div><div>${isAdmin?`<select ${self?'disabled':''} onchange="changeCloudUserRole('${esc(u.id)}',this.value)">${roleOptions}</select>`:`<span class="badge">${esc(roleLabel[u.role]||u.role)}</span>`}</div><div>${isAdmin?`<button class="btn small ${u.active?'danger':''}" ${self?'disabled':''} onclick="toggleCloudUserActive('${esc(u.id)}',${u.active?'false':'true'})">${u.active?'Deaktivieren':'Aktivieren'}</button>`:`<span class="badge ${u.active?'green':'red'}">${u.active?'Aktiv':'Inaktiv'}</span>`}</div><div>${isAdmin?`<button class="btn small" onclick="openAdminPasswordDialog('${esc(u.id)}')">${self?'Eigenes ändern':'Passwort setzen'}</button>`:''}</div></div>`}).join('')||'<div class="empty">Keine Benutzer vorhanden.</div>';
+    wrap.innerHTML=users.map(u=>{const self=u.id===cloud.user?.id;const roleOptions=['admin','manager','staff','cleaning','viewer'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${esc(roleLabel[r]||r)}</option>`).join('');return `<div class="cloud-admin-row password-enabled"><div><b>${esc(u.name)}</b><div class="muted">${esc(u.email)}${self?' · Du':''}</div></div><div>${isAdmin?`<select ${self?'disabled':''} onchange="changeCloudUserRole('${esc(u.id)}',this.value)">${roleOptions}</select>`:`<span class="badge">${esc(roleLabel[u.role]||u.role)}</span>`}</div><div>${isAdmin?`<button class="btn small ${u.active?'danger':''}" ${self?'disabled':''} onclick="toggleCloudUserActive('${esc(u.id)}',${u.active?'false':'true'})">${u.active?'Deaktivieren':'Aktivieren'}</button>`:`<span class="badge ${u.active?'green':'red'}">${u.active?'Aktiv':'Inaktiv'}</span>`}</div><div>${isAdmin?`<button class="btn small" onclick="openAdminPasswordDialog('${esc(u.id)}')">${self?'Eigenes ändern':'Passwort setzen'}</button>`:''}</div><div>${isAdmin?`<button class="btn small danger" ${self?'disabled':''} onclick="deleteCloudUser('${esc(u.id)}')">Löschen</button>`:''}</div></div>`}).join('')||'<div class="empty">Keine Benutzer vorhanden.</div>';
   };
 
   const previousRenderPage=renderPage;renderPage=function(page){previousRenderPage(page);if(page==='settings'){setupPasswordUi();if(cloud.mode==='online'&&['admin','manager'].includes(cloud.user?.role))loadCloudUsers()}};
