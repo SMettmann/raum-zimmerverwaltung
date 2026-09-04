@@ -85,10 +85,12 @@
     const key=groupKey(booking),idx=colorIndex(key);
     for(let i=0;i<8;i++)event.classList.toggle(`rs-group-color-${i}`,i===idx);
     event.dataset.groupId=key;
-    event.textContent=`${booking.guest} · Gruppe ${members.length}`;
+    const label=`${booking.guest} · Gruppe ${members.length}`;
+    if(event.textContent!==label)event.textContent=label;
     const names=members.map(m=>(rooms||[]).find(r=>r.id===m.roomId)?.name||'').filter(Boolean);
     const period=typeof window.bookingPeriodText==='function'?window.bookingPeriodText(booking):`${booking.from} – ${booking.to}`;
-    event.title=`${booking.guest} · Gruppenbuchung mit ${members.length} Einheiten · ${period}\n${names.join(' · ')}`;
+    const title=`${booking.guest} · Gruppenbuchung mit ${members.length} Einheiten · ${period}\n${names.join(' · ')}`;
+    if(event.title!==title)event.title=title;
   }
 
   function decorateBoard(){
@@ -109,8 +111,12 @@
       const guest=roomIsGuest(room),section=guest?'Gästezimmer':'Tagungs- & Veranstaltungsräume';
       const scope=`${currentLocation||String(room.location||'')}|${section}`;
       if(!seen.has(scope)){
-        const count=countVisibleRooms(currentLocation||String(room.location||''),guest);
-        grid.insertBefore(createSection(section,count),row);
+        const previous=row.previousElementSibling;
+        const alreadyThere=previous?.classList.contains('rs-board-section-row')&&previous?.dataset?.section===section;
+        if(!alreadyThere){
+          const count=countVisibleRooms(currentLocation||String(room.location||''),guest);
+          grid.insertBefore(createSection(section,count),row);
+        }
         seen.add(scope);
       }
       row.classList.toggle('rs-room-guest',guest);
