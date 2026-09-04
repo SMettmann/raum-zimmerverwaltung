@@ -28,6 +28,8 @@ jobs:
           node --check password-management.js
           node --check manage.js
           node --check public-booking.js
+          node --check brand-override.js
+          node --check group-booking-board.js
           node --check tests/generate-xrechnung-sample.cjs
           node --check tests/cleaning-v2-smoke.cjs
           node --check tests/live-test-round-one-smoke.cjs
@@ -46,6 +48,7 @@ jobs:
           node --check worker/time-entry.js
           node --check worker/email-entry.js
           node --check worker/password-entry.js
+          node --check worker/owner-protection-entry.js
           node --check worker/time-booking.mjs
           node --check worker/booking-email.mjs
           node --check worker/state-permissions.mjs
