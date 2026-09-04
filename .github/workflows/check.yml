@@ -30,6 +30,7 @@ jobs:
           node --check public-booking.js
           node --check brand-override.js
           node --check group-booking-board.js
+          node --check occupancy-board-clarity.js
           node --check tests/generate-xrechnung-sample.cjs
           node --check tests/cleaning-v2-smoke.cjs
           node --check tests/live-test-round-one-smoke.cjs
