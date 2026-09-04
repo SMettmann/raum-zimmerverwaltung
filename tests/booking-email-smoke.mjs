@@ -12,7 +12,7 @@ const groupAfter={bookings:[
   {id:'solo',status:'confirmed'}
 ]};
 assert.deepEqual(confirmationCandidates({bookings:[]},groupAfter).map(b=>b.id),['g1a','solo'],'Eine neue Gruppenbuchung darf nur eine Bestätigung auslösen.');
-assert.deepEqual(confirmationCandidates({bookings:[{id:'g1a',groupId:'group-1',status:'confirmed'}]},groupAfter),[],'Das Hinzufügen eines weiteren Zimmers zu einer bereits bestätigten Gruppenbuchung darf keine zweite automatische Bestätigung auslösen.');
+assert.deepEqual(confirmationCandidates({bookings:[{id:'g1a',groupId:'group-1',status:'confirmed'}]},groupAfter).map(b=>b.id),['solo'],'Das Hinzufügen eines weiteren Zimmers zu einer bereits bestätigten Gruppenbuchung darf keine zweite automatische Bestätigung für die Gruppe auslösen.');
 
 const state={
   rooms:[
