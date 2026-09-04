@@ -1,13 +1,25 @@
 const TIMED_ROOM_TYPES=new Set(['Seminarraum','Besprechungsraum','Veranstaltungsraum']);
 const RESEND_ENDPOINT='https://api.resend.com/emails';
 
+function bookingGroupKey(booking={}){return String(booking.groupId||booking.bookingGroupId||booking.id||'')}
+function bookingGroupMembers(state={},booking={}){
+  const list=Array.isArray(state.bookings)?state.bookings:[];
+  const key=bookingGroupKey(booking);
+  return list.filter(b=>bookingGroupKey(b)===key).sort((a,b)=>(Number(a.groupOrder)||999)-(Number(b.groupOrder)||999));
+}
+
 export function confirmationCandidates(beforeState={},afterState={}){
-  const before=new Map((Array.isArray(beforeState.bookings)?beforeState.bookings:[]).map(b=>[b.id,b]));
-  return (Array.isArray(afterState.bookings)?afterState.bookings:[]).filter(b=>{
-    if(!b?.id||b.status!=='confirmed')return false;
-    const previous=before.get(b.id);
-    return !previous||previous.status!=='confirmed';
-  });
+  const beforeList=Array.isArray(beforeState.bookings)?beforeState.bookings:[];
+  const afterList=Array.isArray(afterState.bookings)?afterState.bookings:[];
+  const beforeConfirmedGroups=new Set(beforeList.filter(b=>b?.id&&b.status==='confirmed').map(bookingGroupKey));
+  const candidates=new Map();
+  for(const booking of afterList){
+    if(!booking?.id||booking.status!=='confirmed')continue;
+    const key=bookingGroupKey(booking);
+    if(beforeConfirmedGroups.has(key)||candidates.has(key))continue;
+    candidates.set(key,booking);
+  }
+  return [...candidates.values()];
 }
 
 export function bookingRecipient(state={},booking={}){
@@ -30,18 +42,21 @@ export function bookingPeriodText(state={},booking={}){
 }
 
 export function buildBookingConfirmation({state={},booking={},organizationName=''}){
-  const room=(Array.isArray(state.rooms)?state.rooms:[]).find(r=>r.id===booking.roomId);
+  const rooms=Array.isArray(state.rooms)?state.rooms:[];
+  const members=bookingGroupMembers(state,booking);
+  const effectiveMembers=members.length?members:[booking];
+  const roomNames=effectiveMembers.map(member=>rooms.find(r=>r.id===member.roomId)?.name||'Raum / Zimmer');
   const settings=state.settings&&typeof state.settings==='object'?state.settings:{};
   const org=String(organizationName||settings.org||'Ihre Einrichtung').trim();
   const guest=String(booking.guest||'Guten Tag').trim();
-  const roomName=String(room?.name||'Raum / Zimmer').trim();
   const period=bookingPeriodText(state,booking);
   const purpose=String(booking.purpose||'').trim();
   const participants=Number(booking.participants)||0;
   const contact=[settings.email,settings.phone].filter(Boolean).join(' · ');
-  const subject=`Buchungsbestätigung – ${roomName}`;
+  const subject=roomNames.length>1?`Buchungsbestätigung – ${roomNames.length} Zimmer / Räume`:`Buchungsbestätigung – ${roomNames[0]}`;
+  const roomLabel=roomNames.length>1?'Zimmer / Räume':'Raum / Zimmer';
   const details=[
-    `Raum / Zimmer: ${roomName}`,
+    `${roomLabel}: ${roomNames.join(', ')}`,
     `Zeitraum: ${period}`,
     purpose?`Zweck / Veranstaltung: ${purpose}`:'',
     participants?`Teilnehmerzahl: ${participants}`:''
@@ -70,7 +85,8 @@ export async function sendBookingConfirmationOnce(env,{orgId,organizationName,st
   if(!booking||booking.status!=='confirmed')return {status:'not_confirmed'};
   const recipient=bookingRecipient(state,booking);
   if(!recipient)return {status:'no_recipient'};
-  const eventKey=`booking-confirmation/${String(orgId||'org')}/${String(booking.id)}`.slice(0,256);
+  const groupKey=bookingGroupKey(booking);
+  const eventKey=`booking-confirmation/${String(orgId||'org')}/${groupKey}`.slice(0,256);
   const existing=await env.DB.prepare('SELECT status FROM email_log WHERE event_key=?').bind(eventKey).first();
   if(existing?.status==='sent')return {status:'already_sent'};
 
